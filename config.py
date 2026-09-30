@@ -16,5 +16,6 @@ SPEEDS = [0.25, 0.5, 1, 2, 4, 8]
 UV_PER_SPACING = 150.0         # 初始灵敏度：多少 µV 对应一个通道间距
 GAIN_STEP = 1.25               # 每次按 ↑/↓ 的灵敏度倍率
 REMOVE_WINDOW_MEAN = True      # 显示时减去窗口内均值，避免基线漂移把曲线推出画面
-LINE_COLOR = (30, 30, 30)
+LINE_COLOR = (30, 30, 30)        # 找不到颜色时的默认线色
+CHANNEL_CMAP_PATH = Path(__file__).resolve().parent / "channel_cmap.json"   # 通道颜色表
 USE_OPENGL = False             # 曲线卡顿时可尝试改 True

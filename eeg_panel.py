@@ -1,10 +1,22 @@
 """脑电面板：10 s 窗口，播放头固定在正中，数据随主时钟滚动。"""
+import json
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 import config
 
+def load_channel_colors(path):
+    """读取 {通道名: {"0": r, "1": g, "2": b}}（0~1）→ {通道名: (R, G, B)}（0~255）。"""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for name, c in raw.items():
+        out[name] = tuple(int(round(255 * min(max(float(c[k]), 0.0), 1.0))) for k in ("0", "1", "2"))
+    return out
 
 class EEGPanel(QtWidgets.QWidget):
     gainChanged = QtCore.Signal(float)     # 当前灵敏度 (µV / 通道间距)
@@ -41,8 +53,13 @@ class EEGPanel(QtWidgets.QWidget):
         ax.setStyle(tickFont=font)
         pi.setYRange(-1, self.n_ch, padding=0)
 
-        self.curve = pg.PlotCurveItem(pen=pg.mkPen(config.LINE_COLOR, width=1))
-        pi.addItem(self.curve)
+        cmap = load_channel_colors(config.CHANNEL_CMAP_PATH)
+        self.curves = []                       # 每个通道一条曲线，各自上色
+        for name in eeg.names:
+            color = cmap.get(name.strip(), config.LINE_COLOR)
+            c = pg.PlotCurveItem(pen=pg.mkPen(color, width=1))
+            pi.addItem(c)
+            self.curves.append(c)
         self.playhead = pg.InfiniteLine(pos=0, angle=90, movable=False,
                                         pen=pg.mkPen("r", width=1.5))
         pi.addItem(self.playhead)
@@ -74,22 +91,16 @@ class EEGPanel(QtWidgets.QWidget):
 
         L = b - a
         if L < 2:
-            self.curve.setData([], [])
+            for c in self.curves:
+                c.setData([], [])
             return
 
         seg = self.eeg.data[:, a:b]
         if self.remove_mean:
             seg = seg - seg.mean(axis=1, keepdims=True)
 
-        # 所有通道拼成一条折线，通道之间用 NaN 断开，只需一次绘制调用
-        y = np.empty((self.n_ch, L + 1), dtype=np.float32)
-        np.multiply(seg, 1.0 / self.uv_per_spacing, out=y[:, :L])
-        y[:, :L] += self.offsets
-        y[:, L] = np.nan
-
-        x = np.empty(L + 1, dtype=np.float64)
-        x[:L] = np.arange(a, b) / fs
-        x[L] = x[L - 1]
-        xs = np.broadcast_to(x, (self.n_ch, L + 1)).ravel()
-
-        self.curve.setData(xs, y.ravel(), connect="finite")
+        y = seg * np.float32(1.0 / self.uv_per_spacing)
+        y += self.offsets
+        x = np.arange(a, b) / fs
+        for i, c in enumerate(self.curves):
+            c.setData(x, y[i], skipFiniteCheck=True)
