@@ -1,0 +1,6 @@
+numpy
+scipy
+pandas
+mne
+pyqtgraph
+PyQt6

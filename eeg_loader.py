@@ -14,6 +14,8 @@ class EEGData:
     data: np.ndarray      # (n_ch, n_samples) float32, µV
     names: list           # 通道名
     fs: float             # 降采样后的采样率
+    sample_start: float = None      # BDF 标注里 sample_start 的时间 (s)；没有则为 None
+    annotations: list = None        # (onset, description) 列表，供诊断
 
     @property
     def duration(self):
@@ -27,6 +29,14 @@ def _open_raw(path):
     if ext == ".edf":
         return mne.io.read_raw_edf(path, preload=False, verbose="ERROR")
     raise ValueError(f"不支持的文件类型: {ext}")
+
+
+def find_sample_start(raw):
+    """在标注中查找 sample_start，返回 (onset 或 None, 全部标注列表)。"""
+    ann = [(float(o), str(d)) for o, d in zip(raw.annotations.onset, raw.annotations.description)]
+    key = config.SAMPLE_START_KEY.lower()
+    hits = [o for o, d in ann if key in d.lower()]
+    return (min(hits) if hits else None), ann
 
 
 def _decimate_chunked(raw, picks, factor, progress):
@@ -59,16 +69,18 @@ def load_eeg(path, target_fs=config.TARGET_FS, progress=None, use_cache=True):
     st = path.stat()
     cache_file = config.CACHE_DIR / f"{path.stem}_{st.st_size}_{int(st.st_mtime)}_{int(target_fs)}.npz"
 
-    if use_cache and cache_file.exists():
-        if progress:
-            progress(0.5, "读取缓存…")
-        z = np.load(cache_file)
-        return EEGData(z["data"], [str(s) for s in z["names"]], float(z["fs"]))
-
     if progress:
         progress(0.02, "打开文件…")
     raw = _open_raw(str(path))
     fs = raw.info["sfreq"]
+    sample_start, ann = find_sample_start(raw)
+
+    if use_cache and cache_file.exists():
+        if progress:
+            progress(0.5, "读取缓存…")
+        z = np.load(cache_file)
+        return EEGData(z["data"], [str(s) for s in z["names"]], float(z["fs"]), sample_start, ann)
+
     types = raw.get_channel_types()
     picks = [i for i, t in enumerate(types) if t != "stim"]      # 排除 Status/触发通道
     names = [raw.ch_names[i] for i in picks]
@@ -87,7 +99,7 @@ def load_eeg(path, target_fs=config.TARGET_FS, progress=None, use_cache=True):
         names = list(raw.ch_names)
 
     data -= np.median(data, axis=1, keepdims=True).astype(np.float32)   # 去掉各通道直流偏置
-    eeg = EEGData(data, names, float(target_fs))
+    eeg = EEGData(data, names, float(target_fs), sample_start, ann)
 
     if use_cache:
         config.CACHE_DIR.mkdir(parents=True, exist_ok=True)
