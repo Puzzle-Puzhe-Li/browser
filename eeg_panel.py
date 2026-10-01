@@ -49,7 +49,7 @@ class EEGPanel(QtWidgets.QWidget):
         ax.setTicks([[(float(self.n_ch - 1 - i), n) for i, n in enumerate(eeg.names)]])
         ax.setWidth(55)
         font = QtGui.QFont()
-        font.setPointSize(7)
+        font.setPointSize(5)
         ax.setStyle(tickFont=font)
         pi.setYRange(-1, self.n_ch, padding=0)
 

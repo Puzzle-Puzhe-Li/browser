@@ -68,7 +68,7 @@ class SignalPanel(QtWidgets.QWidget):
         ax.setTicks([[(float(self.n_ch - 1 - i), n) for i, n in enumerate(names)]])
         ax.setWidth(config.AXIS_WIDTH)
         font = QtGui.QFont()
-        font.setPointSize(7)
+        font.setPointSize(5)
         ax.setStyle(tickFont=font)
         if zero_baseline:
             pi.setYRange(-0.6, self.n_ch + 0.6, padding=0)
