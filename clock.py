@@ -16,7 +16,7 @@ class Clock(QtCore.QObject):
         self._wall0 = 0.0
         self._t0 = 0.0
         self._timer = QtCore.QTimer(self)
-        self._timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)
+        self._timer.setTimerType(QtCore.Qt.TimerType.CoarseTimer)
         self._timer.setInterval(max(1, int(1000 / fps)))
         self._timer.timeout.connect(self._tick)
 

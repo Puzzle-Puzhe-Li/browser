@@ -21,7 +21,7 @@ CACHE_DIR = Path(__file__).resolve().parent / "cache"   # 降采样结果缓存
 WINDOW_SEC = 10.0              # 窗口长度 (s)，播放头固定在正中
 SAMPLE_START_KEY = "sample_start"   # BDF 标注里代表“运动数据 0 时刻”的名字
 EEG_OFFSET = 5.0               # 找不到 sample_start 标注时的默认值 (s)
-FPS = 60                       # 界面刷新率
+FPS = 30
 SPEEDS = [0.25, 0.5, 1, 2, 4, 8]
 
 # ---- 布局 ----

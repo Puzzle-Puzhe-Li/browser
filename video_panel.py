@@ -6,7 +6,6 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 import config
 
-
 class VideoPanel(QtWidgets.QWidget):
     def __init__(self, path, clock, t_offset=0.0, parent=None):
         super().__init__(parent)
