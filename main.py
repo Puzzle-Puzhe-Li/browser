@@ -7,7 +7,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import config
 from clock import Clock
 from eeg_loader import load_eeg
-from motion_loader import load_speed_csv, load_blink_times
+from motion_loader import load_speed_csv, load_blink_times, load_video_intercept
 from signal_panel import SignalPanel, load_colors
 from video_panel import VideoPanel
 
@@ -37,13 +37,16 @@ class MainWindow(QtWidgets.QWidget):
             self.t0, self.t0_src = config.EEG_OFFSET, "默认偏移"
 
         # 视频 0 秒在 EEG 时间轴上的位置
+        self.video_intercept = (load_video_intercept(config.sync_model_path(session))
+                                if config.USE_VIDEO_SYNC else 0.0)
+        print(f"[同步] 视频截距 {self.video_intercept:.4f} s")
         if eeg.video_start is not None:
-            self.v0, self.v0_src = eeg.video_start + config.VIDEO_OFFSET, "BDF 标注"
+            self.v0, self.v0_src = eeg.video_start + config.VIDEO_OFFSET + self.video_intercept, "BDF 标注"
         else:
-            self.v0, self.v0_src = self.t0 + config.VIDEO_OFFSET, "sample_start 回退"     
+            self.v0, self.v0_src = self.t0 + config.VIDEO_OFFSET + self.video_intercept, "sample_start 回退"  
 
         # 眨眼时刻：eog_time 相对 video_start，换算为 EEG 时间
-        vbase = eeg.video_start if eeg.video_start is not None else self.v0
+        vbase = eeg.video_start if eeg.video_start is not None else self.t0
         blink_rel = load_blink_times(config.blink_path(session))
         self.blink_times = blink_rel + vbase
         print(f"[眨眼] {len(blink_rel)} 次，基准 {vbase:.3f} s")

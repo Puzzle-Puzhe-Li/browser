@@ -47,6 +47,11 @@ BLINK_TICK_HEIGHT = 0.35       # 短刻度高度（单位：通道间距）
 def video_path(session):
     return DATA_ROOT / "videos" / "viz" / f"kinetics_video_grid_layout_{session}.mp4"
 
+def sync_model_path(session):
+    return DATA_ROOT / "sync" / f"model_sync_{session}_video2ecog.pkl"
+
+USE_VIDEO_SYNC = True          # 是否用同步模型的截距修正视频时间轴
+
 VIDEO_OFFSET = 0.0             # 视频 0 秒相对"运动 0 时刻"的偏移 (s)；视频与运动数据对齐时为 0
 VIDEO_MAX_SKIP = 15            # 前进不超过该帧数时用顺序读取，否则 seek
 VIDEO_MIN_FRAC = 0.22          # 视频列占窗口宽度的最小比例

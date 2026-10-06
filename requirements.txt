@@ -6,3 +6,5 @@ pyqtgraph
 PyQt6
 opencv-python
 openpyxl
+joblib
+scikit-learn
