@@ -29,6 +29,7 @@ SPEEDS = [0.25, 0.5, 1, 2, 4, 8]
 STRETCH_SPEED = 1              # 速度:脑电 的纵向比例（之后加 TFR 为 1:3:2）
 STRETCH_EEG = 3
 AXIS_WIDTH = 90                # 左侧通道名区域宽度，各面板一致以保证时间轴对齐
+START_MAXIMIZED = True         # 启动时直接最大化
 
 # ---- 脑电显示 ----
 UV_PER_SPACING = 20.0         # 初始灵敏度：多少 µV 对应一个通道间距

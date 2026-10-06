@@ -71,6 +71,9 @@ class MainWindow(QtWidgets.QWidget):
             unit_per_spacing=config.UV_PER_SPACING, remove_mean=config.REMOVE_WINDOW_MEAN,
             zero_baseline=False, show_time_axis=True, axis_zero=self.t0)
 
+        for p in (self.speed_panel, self.eeg_panel):
+            p.setMinimumSize(100, 50)
+
         self._updating = False
         NF = QtCore.Qt.FocusPolicy.NoFocus     # 让方向键、空格始终由主窗口接收
 
@@ -136,16 +139,68 @@ class MainWindow(QtWidgets.QWidget):
 
         self._on_time(0.0)
         self._refresh_info()
+        self.setMinimumSize(640, 480)
+
+    def place_normal(self):
+        """show 之前调用：把"正常（非最大化）状态"的大小和位置设成屏幕可用区域内居中。"""
+        screen = self.screen() or QtGui.QGuiApplication.primaryScreen()
+        geo = screen.availableGeometry()
+        W, H, _ = self._plan_geometry()
+        self.resize(W, H)
+        x = geo.left() + (geo.width() - W) // 2
+        y = geo.top() + max((geo.height() - H) // 2 - 20, 0)   # 为标题栏留点空间
+        self.move(x, y)
+
+    def changeEvent(self, e):
+        # 从最大化/最小化还原为正常状态时，用真实外框尺寸重新校正位置和大小
+        if e.type() == QtCore.QEvent.Type.WindowStateChange:
+            old = e.oldState()
+            if (old & QtCore.Qt.WindowState.WindowMaximized or
+                    old & QtCore.Qt.WindowState.WindowMinimized) \
+                    and self.windowState() == QtCore.Qt.WindowState.WindowNoState:
+                QtCore.QTimer.singleShot(0, self.fit_to_screen)
+        super().changeEvent(e)        
+
+    def fit_to_screen(self):
+        if self.isMaximized() or self.isFullScreen():
+            return
+        screen = self.screen() or QtGui.QGuiApplication.primaryScreen()
+        geo = screen.availableGeometry()
+        fg, g = self.frameGeometry(), self.geometry()
+        frame_w, frame_h = fg.width() - g.width(), fg.height() - g.height()
+
+        # 外框总尺寸不超过可用区域，并留出少量边距
+        w = min(fg.width(), geo.width())
+        h = min(fg.height(), geo.height())
+        self.resize(w - frame_w, h - frame_h)
+
+        fg = self.frameGeometry()
+        x = min(max(geo.center().x() - fg.width() // 2, geo.left()),
+                geo.right() - fg.width() + 1)
+        y = min(max(geo.center().y() - fg.height() // 2, geo.top()),
+                geo.bottom() - fg.height() + 1)
+        self.move(x, y)
 
     def _plan_geometry(self):
-        """按屏幕和视频宽高比规划窗口大小与视频列宽度（像素，同时用作 stretch 比例）。"""
-        geo = QtGui.QGuiApplication.primaryScreen().availableGeometry()
-        W = int(geo.width() * config.WINDOW_SCREEN_FRAC[0])
-        H = int(geo.height() * config.WINDOW_SCREEN_FRAC[1])
+        """返回 (W, H, video_w)：W/H 为客户区的目标尺寸（已扣除窗口外框），
+        video_w 为视频列宽度（像素，同时用作 stretch 比例）。"""
+        screen = self.screen() or QtGui.QGuiApplication.primaryScreen()
+        geo = screen.availableGeometry()
+
+        # 窗口外框（标题栏+边框）厚度：show() 之前 frameGeometry 不可靠，给个保守估计
+        frame_w, frame_h = 16, 48
+        fg, g = self.frameGeometry(), self.geometry()
+        if fg.height() > g.height():                 # 已有真实数据时直接用
+            frame_w, frame_h = fg.width() - g.width(), fg.height() - g.height()
+
+        W = int(geo.width() * config.WINDOW_SCREEN_FRAC[0]) - frame_w
+        H = int(geo.height() * config.WINDOW_SCREEN_FRAC[1]) - frame_h
+        W, H = max(W, 640), max(H, 480)
+
         video_w = 0
         if self.video_panel is not None:
-            avail_h = H - 110                       # 扣除底部控制栏
-            ideal = self.video_panel.aspect * avail_h   # 视频恰好占满高度所需的宽度
+            avail_h = H - 110                            # 扣除底部控制栏
+            ideal = self.video_panel.aspect * avail_h
             video_w = int(min(max(ideal, config.VIDEO_MIN_FRAC * W),
                               config.VIDEO_MAX_FRAC * W))
         return W, H, video_w
@@ -239,7 +294,12 @@ def main():
           f"起点 {speed.t_start:g} s")
 
     win = MainWindow(eeg, speed, session)
-    win.show()
+    win.place_normal()                       # 先设好"还原后"的大小与位置
+    if config.START_MAXIMIZED:
+        win.showMaximized()
+    else:
+        win.show()
+        QtCore.QTimer.singleShot(0, win.fit_to_screen)
     win.setFocus()
     sys.exit(app.exec())
 
