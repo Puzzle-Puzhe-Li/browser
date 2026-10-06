@@ -38,17 +38,11 @@ class MainWindow(QtWidgets.QWidget):
 
         self.clock = Clock(eeg.duration, fps=config.FPS, parent=self)
 
-        # 速度数据默认灵敏度：全部有效值的高百分位
-        vals = speed.data[np.isfinite(speed.data)]
-        speed_gain = float(np.percentile(vals, config.SPEED_GAIN_PERCENTILE)) if vals.size else 1.0
-        if not speed_gain > 0:
-            speed_gain = 1.0
-
         self.speed_panel = SignalPanel(
             speed.data, speed.names, speed.fs, self.clock,
             colors=load_colors(config.JOINT_CMAP_PATH),
             t_offset=self.t0 + speed.t_start,
-            unit_per_spacing=speed_gain, remove_mean=False,
+            unit_per_spacing=config.SPEED_PER_SPACING, remove_mean=False,
             zero_baseline=True, show_time_axis=False)
         self.eeg_panel = SignalPanel(
             eeg.data, eeg.names, eeg.fs, self.clock,
@@ -83,8 +77,8 @@ class MainWindow(QtWidgets.QWidget):
 
         self.info = QtWidgets.QLabel()
         self.hint = QtWidgets.QLabel(
-            "空格 播放/暂停   ←/→ ±1 s   Shift+←/→ ±10 s   ↑/↓ 脑电灵敏度   "
-            "Shift+↑/↓ 速度灵敏度   Home/End 首/尾")
+            "空格 播放/暂停   ←/→ ±1 s   Shift+←/→ ±10 s   "
+            "↑/↓ 脑电+速度灵敏度   Home/End 首/尾")
 
         row = QtWidgets.QHBoxLayout()
         for w in (self.btn, self.slider, self.time_label, self.speed_box, self.mean_chk):
@@ -126,8 +120,8 @@ class MainWindow(QtWidgets.QWidget):
 
     def _refresh_info(self, *_):
         self.info.setText(
-            f"脑电 {self.eeg_panel.unit_per_spacing:.0f} µV/间距   "
-            f"速度 {self.speed_panel.unit_per_spacing:.3g}/间距   "
+            f"脑电 {self.eeg_panel.unit_per_spacing:.0f} µV/行   "
+            f"速度 {self.speed_panel.unit_per_spacing:.3g} cm·s^(-1)/行   "
             f"运动起点 {self.t0:.3f} s ({self.t0_src})")
 
     def keyPressEvent(self, e):
@@ -142,8 +136,8 @@ class MainWindow(QtWidgets.QWidget):
         elif k == K.Key_Right:
             self.clock.step(10 if shift else 1)
         elif k in (K.Key_Up, K.Key_Down):
-            panel = self.speed_panel if shift else self.eeg_panel
-            panel.change_gain(k == K.Key_Up)
+            self.speed_panel.change_gain(k == K.Key_Up)
+            self.eeg_panel.change_gain(k == K.Key_Up)
         elif k == K.Key_Home:
             self.clock.seek(0)
         elif k == K.Key_End:
