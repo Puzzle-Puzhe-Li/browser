@@ -5,3 +5,4 @@ mne
 pyqtgraph
 PyQt6
 opencv-python
+openpyxl

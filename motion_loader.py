@@ -32,3 +32,17 @@ def load_speed_csv(path):
         vals = np.vstack([np.interp(grid, t, v) for v in vals])
         t = grid
     return MotionData(vals.astype(np.float32), names, 1.0 / dt, float(t[0]))
+
+def load_blink_times(path):
+    """读取眨眼表的 eog_time 列（秒，相对 video_start）。失败返回空数组。"""
+    try:
+        df = pd.read_excel(path)
+    except Exception as ex:
+        print(f"[眨眼] 读取失败: {ex}")
+        return np.array([], dtype=float)
+    df.columns = [str(c).strip() for c in df.columns]
+    if "eog_time" not in df.columns:
+        print(f"[眨眼] 没有 eog_time 列，现有列: {list(df.columns)}")
+        return np.array([], dtype=float)
+    t = pd.to_numeric(df["eog_time"], errors="coerce").dropna().to_numpy(dtype=float)
+    return np.sort(t)

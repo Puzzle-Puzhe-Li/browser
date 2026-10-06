@@ -7,7 +7,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import config
 from clock import Clock
 from eeg_loader import load_eeg
-from motion_loader import load_speed_csv
+from motion_loader import load_speed_csv, load_blink_times
 from signal_panel import SignalPanel, load_colors
 from video_panel import VideoPanel
 
@@ -40,7 +40,13 @@ class MainWindow(QtWidgets.QWidget):
         if eeg.video_start is not None:
             self.v0, self.v0_src = eeg.video_start + config.VIDEO_OFFSET, "BDF 标注"
         else:
-            self.v0, self.v0_src = self.t0 + config.VIDEO_OFFSET, "sample_start 回退"            
+            self.v0, self.v0_src = self.t0 + config.VIDEO_OFFSET, "sample_start 回退"     
+
+        # 眨眼时刻：eog_time 相对 video_start，换算为 EEG 时间
+        vbase = eeg.video_start if eeg.video_start is not None else self.v0
+        blink_rel = load_blink_times(config.blink_path(session))
+        self.blink_times = blink_rel + vbase
+        print(f"[眨眼] {len(blink_rel)} 次，基准 {vbase:.3f} s")
 
         self.clock = Clock(eeg.duration, fps=config.FPS, parent=self)
 
@@ -55,6 +61,9 @@ class MainWindow(QtWidgets.QWidget):
                 print(f"[视频] {ex}")
         else:
             print(f"[视频] 未找到 {vpath}")
+            
+        # 单帧步长使用的帧率：优先用视频真实帧率，没有视频则用 config.FPS
+        self.frame_fps = self.video_panel.fps if self.video_panel is not None else config.FPS            
         W, H, video_w = self._plan_geometry()
         self.resize(W, H)
 
@@ -69,8 +78,10 @@ class MainWindow(QtWidgets.QWidget):
             colors=load_colors(config.CHANNEL_CMAP_PATH),
             t_offset=0.0,
             unit_per_spacing=config.UV_PER_SPACING, remove_mean=config.REMOVE_WINDOW_MEAN,
-            zero_baseline=False, show_time_axis=True, axis_zero=self.t0)
-
+            zero_baseline=False, show_time_axis=True, axis_zero=self.t0,
+            marks=self.blink_times, mark_color=config.BLINK_COLOR,
+            mark_height=config.BLINK_TICK_HEIGHT)
+        
         for p in (self.speed_panel, self.eeg_panel):
             p.setMinimumSize(100, 50)
 
@@ -100,7 +111,7 @@ class MainWindow(QtWidgets.QWidget):
 
         self.info = QtWidgets.QLabel()
         self.hint = QtWidgets.QLabel(
-            "空格 播放/暂停   ←/→ ±1 s   Shift+←/→ ±10 s   "
+            "空格 播放/暂停   ←/→ ±1 s   Shift+←/→ ±10 s   Ctrl+←/→ ±1 帧   "
             "↑/↓ 脑电+速度灵敏度   Home/End 首/尾")
 
         row = QtWidgets.QHBoxLayout()
@@ -231,13 +242,19 @@ class MainWindow(QtWidgets.QWidget):
         K = QtCore.Qt.Key
         M = QtCore.Qt.KeyboardModifier
         shift = (e.modifiers() & M.ShiftModifier) == M.ShiftModifier
+        ctrl = (e.modifiers() & M.ControlModifier) == M.ControlModifier        
         k = e.key()
         if k == K.Key_Space:
             self.clock.toggle()
-        elif k == K.Key_Left:
-            self.clock.step(-10 if shift else -1)
-        elif k == K.Key_Right:
-            self.clock.step(10 if shift else 1)
+        elif k in (K.Key_Left, K.Key_Right):
+            sign = -1 if k == K.Key_Left else 1
+            if ctrl:
+                step = 1.0 / self.frame_fps            # 1 帧
+            elif shift:
+                step = 10.0
+            else:
+                step = 1.0
+            self.clock.step(sign * step)
         elif k in (K.Key_Up, K.Key_Down):
             self.speed_panel.change_gain(k == K.Key_Up)
             self.eeg_panel.change_gain(k == K.Key_Up)

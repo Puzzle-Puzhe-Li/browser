@@ -36,6 +36,13 @@ UV_PER_SPACING = 20.0         # 初始灵敏度：多少 µV 对应一个通道�
 GAIN_STEP = 1.25               # 每次按 ↑/↓ 的灵敏度倍率
 REMOVE_WINDOW_MEAN = True      # 显示时减去窗口内均值，避免基线漂移把曲线推出画面
 
+# ---- 眨眼标记 ----
+def blink_path(session):
+    return DATA_ROOT / "sync" / f"blink_frames_{session}.xlsx"
+
+BLINK_COLOR = (70, 70, 70)     # 深灰色
+BLINK_TICK_HEIGHT = 0.35       # 短刻度高度（单位：通道间距）
+
 # ---- 视频 ----
 def video_path(session):
     return DATA_ROOT / "videos" / "viz" / f"kinetics_video_grid_layout_{session}.mp4"

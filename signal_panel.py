@@ -30,7 +30,8 @@ class SignalPanel(QtWidgets.QWidget):
 
     def __init__(self, data, names, fs, clock, colors=None, t_offset=0.0,
                  unit_per_spacing=100.0, remove_mean=False, zero_baseline=False,
-                 show_time_axis=True, axis_zero=0.0, parent=None):
+                 show_time_axis=True, axis_zero=0.0, 
+                 marks=None, mark_color=(70, 70, 70), mark_height=0.35, parent=None):
         super().__init__(parent)
         self.data = data
         self.names = names
@@ -83,6 +84,17 @@ class SignalPanel(QtWidgets.QWidget):
             c = pg.PlotCurveItem(pen=pg.mkPen(color, width=1))
             pi.addItem(c)
             self.curves.append(c)
+
+        # 事件标记（如眨眼）：贴着横轴的短竖线，marks 为 EEG 时间（秒）
+        if marks is not None and len(marks) > 0:
+            m = np.asarray(marks, dtype=float) - self.axis_zero
+            ylo = -0.6 if zero_baseline else -1.0          # 与 setYRange 下限一致
+            xs = np.repeat(m, 2)
+            ys = np.tile([ylo, ylo + mark_height], len(m))
+            self.mark_item = pg.PlotCurveItem(xs, ys, connect="pairs",
+                                              pen=pg.mkPen(mark_color, width=2))
+            pi.addItem(self.mark_item)        
+                
         self.playhead = pg.InfiniteLine(pos=0, angle=90, movable=False,
                                         pen=pg.mkPen("r", width=1.5))
         pi.addItem(self.playhead)
