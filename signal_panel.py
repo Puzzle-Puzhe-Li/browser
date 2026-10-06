@@ -30,13 +30,14 @@ class SignalPanel(QtWidgets.QWidget):
 
     def __init__(self, data, names, fs, clock, colors=None, t_offset=0.0,
                  unit_per_spacing=100.0, remove_mean=False, zero_baseline=False,
-                 show_time_axis=True, parent=None):
+                 show_time_axis=True, axis_zero=0.0, parent=None):
         super().__init__(parent)
         self.data = data
         self.names = names
         self.fs = float(fs)
         self.clock = clock
         self.t_offset = float(t_offset)
+        self.axis_zero = float(axis_zero)      # 坐标轴 0 对应的 EEG 时间
         self.unit_per_spacing = float(unit_per_spacing)
         self.remove_mean = remove_mean
         self.n_ch, self.n_samp = data.shape
@@ -59,7 +60,7 @@ class SignalPanel(QtWidgets.QWidget):
 
         bottom = pi.getAxis("bottom")
         if show_time_axis:
-            pi.setLabel("bottom", "EEG 时间 (s)")
+            pi.setLabel("bottom", "时间 (s)")
         else:                                   # 保留网格线，只隐藏刻度数字
             bottom.setStyle(showValues=False)
             bottom.setHeight(6)
@@ -108,8 +109,9 @@ class SignalPanel(QtWidgets.QWidget):
         b = min(i0 + self.n_win + 1, self.n_samp)
 
         pi = self.plot.getPlotItem()
-        pi.setXRange(t - self.half, t + self.half, padding=0)
-        self.playhead.setPos(t)
+        tz = t - self.axis_zero
+        pi.setXRange(tz - self.half, tz + self.half, padding=0)
+        self.playhead.setPos(tz)
 
         if b - a < 2:
             for c in self.curves:
@@ -123,7 +125,7 @@ class SignalPanel(QtWidgets.QWidget):
 
         y = seg * np.float32(1.0 / self.unit_per_spacing)
         y += self.offsets
-        x = np.arange(a, b) / self.fs + self.t_offset
+        x = np.arange(a, b) / self.fs + self.t_offset - self.axis_zero
         for i, c in enumerate(self.curves):
             if self.has_nan:
                 c.setData(x, y[i], connect="finite")

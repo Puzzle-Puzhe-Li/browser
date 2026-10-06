@@ -63,13 +63,13 @@ class MainWindow(QtWidgets.QWidget):
             colors=load_colors(config.JOINT_CMAP_PATH),
             t_offset=self.t0 + speed.t_start,
             unit_per_spacing=config.SPEED_PER_SPACING, remove_mean=False,
-            zero_baseline=True, show_time_axis=False)
+            zero_baseline=True, show_time_axis=False, axis_zero=self.t0)
         self.eeg_panel = SignalPanel(
             eeg.data, eeg.names, eeg.fs, self.clock,
             colors=load_colors(config.CHANNEL_CMAP_PATH),
             t_offset=0.0,
             unit_per_spacing=config.UV_PER_SPACING, remove_mean=config.REMOVE_WINDOW_MEAN,
-            zero_baseline=False, show_time_axis=True)
+            zero_baseline=False, show_time_axis=True, axis_zero=self.t0)
 
         self._updating = False
         NF = QtCore.Qt.FocusPolicy.NoFocus     # 让方向键、空格始终由主窗口接收
@@ -164,7 +164,7 @@ class MainWindow(QtWidgets.QWidget):
         self.slider.setValue(int(t * 10))
         self._updating = False
         self.time_label.setText(
-            f"EEG {t:8.2f} / {self.clock.duration:.2f} s   |   运动 {t - self.t0:8.2f} s")
+            f"时间 {t - self.t0:8.2f} s   |   EEG {t:8.2f} / {self.clock.duration:.2f} s")
 
     def _refresh_info(self, *_):
         self.info.setText(
