@@ -15,6 +15,7 @@ class EEGData:
     names: list           # 通道名
     fs: float             # 降采样后的采样率
     sample_start: float = None      # BDF 标注里 sample_start 的时间 (s)；没有则为 None
+    video_start: float = None       # BDF 标注里 video_start 的时间 (s)
     annotations: list = None        # (onset, description) 列表，供诊断
 
     @property
@@ -38,6 +39,9 @@ def find_sample_start(raw):
     hits = [o for o, d in ann if key in d.lower()]
     return (min(hits) if hits else None), ann
 
+def find_onset(ann, key):
+    hits = [o for o, d in ann if key.lower() in d.lower()]
+    return min(hits) if hits else None
 
 def _decimate_chunked(raw, picks, factor, progress):
     """分块读取 + 整数倍抗混叠降采样。块两侧留余量，避免块边界的滤波瞬态。"""
@@ -74,12 +78,13 @@ def load_eeg(path, target_fs=config.TARGET_FS, progress=None, use_cache=True):
     raw = _open_raw(str(path))
     fs = raw.info["sfreq"]
     sample_start, ann = find_sample_start(raw)
+    video_start = find_onset(ann, config.VIDEO_START_KEY)
 
     if use_cache and cache_file.exists():
         if progress:
             progress(0.5, "读取缓存…")
         z = np.load(cache_file)
-        return EEGData(z["data"], [str(s) for s in z["names"]], float(z["fs"]), sample_start, ann)
+        return EEGData(z["data"], [str(s) for s in z["names"]], float(z["fs"]), sample_start, video_start, ann)
 
     types = raw.get_channel_types()
     picks = [i for i, t in enumerate(types) if t != "stim"]      # 排除 Status/触发通道
@@ -99,7 +104,7 @@ def load_eeg(path, target_fs=config.TARGET_FS, progress=None, use_cache=True):
         names = list(raw.ch_names)
 
     data -= np.median(data, axis=1, keepdims=True).astype(np.float32)   # 去掉各通道直流偏置
-    eeg = EEGData(data, names, float(target_fs), sample_start, ann)
+    eeg = EEGData(data, names, float(target_fs), sample_start, video_start, ann)
 
     if use_cache:
         config.CACHE_DIR.mkdir(parents=True, exist_ok=True)

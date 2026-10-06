@@ -36,6 +36,12 @@ class MainWindow(QtWidgets.QWidget):
         else:
             self.t0, self.t0_src = config.EEG_OFFSET, "默认偏移"
 
+        # 视频 0 秒在 EEG 时间轴上的位置
+        if eeg.video_start is not None:
+            self.v0, self.v0_src = eeg.video_start + config.VIDEO_OFFSET, "BDF 标注"
+        else:
+            self.v0, self.v0_src = self.t0 + config.VIDEO_OFFSET, "sample_start 回退"            
+
         self.clock = Clock(eeg.duration, fps=config.FPS, parent=self)
 
         # 视频（缺失或打不开时跳过，其余功能照常）
@@ -44,7 +50,7 @@ class MainWindow(QtWidgets.QWidget):
         if vpath.exists():
             try:
                 self.video_panel = VideoPanel(
-                    vpath, self.clock, t_offset=self.t0 + config.VIDEO_OFFSET)
+                    vpath, self.clock, t_offset=self.v0)
             except OSError as ex:
                 print(f"[视频] {ex}")
         else:
