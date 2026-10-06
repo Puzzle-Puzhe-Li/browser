@@ -3,13 +3,13 @@ import sys
 
 import numpy as np
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtWidgets
-
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import config
 from clock import Clock
 from eeg_loader import load_eeg
 from motion_loader import load_speed_csv
 from signal_panel import SignalPanel, load_colors
+from video_panel import VideoPanel
 
 
 class JumpSlider(QtWidgets.QSlider):
@@ -24,10 +24,10 @@ class JumpSlider(QtWidgets.QSlider):
 
 
 class MainWindow(QtWidgets.QWidget):
+
     def __init__(self, eeg, speed, session):
         super().__init__()
         self.setWindowTitle(f"EEG Browser - session {session}")
-        self.resize(1500, 950)
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
 
         # 运动数据的 0 时刻在 EEG 时间轴上的位置
@@ -37,6 +37,20 @@ class MainWindow(QtWidgets.QWidget):
             self.t0, self.t0_src = config.EEG_OFFSET, "默认偏移"
 
         self.clock = Clock(eeg.duration, fps=config.FPS, parent=self)
+
+        # 视频（缺失或打不开时跳过，其余功能照常）
+        self.video_panel = None
+        vpath = config.video_path(session)
+        if vpath.exists():
+            try:
+                self.video_panel = VideoPanel(
+                    vpath, self.clock, t_offset=self.t0 + config.VIDEO_OFFSET)
+            except OSError as ex:
+                print(f"[视频] {ex}")
+        else:
+            print(f"[视频] 未找到 {vpath}")
+        W, H, video_w = self._plan_geometry()
+        self.resize(W, H)
 
         self.speed_panel = SignalPanel(
             speed.data, speed.names, speed.fs, self.clock,
@@ -87,9 +101,19 @@ class MainWindow(QtWidgets.QWidget):
         row2.addWidget(self.hint, 1)
         row2.addWidget(self.info)
 
+        right = QtWidgets.QVBoxLayout()
+        right.addWidget(self.speed_panel, config.STRETCH_SPEED)
+        right.addWidget(self.eeg_panel, config.STRETCH_EEG)
+
+        top = QtWidgets.QHBoxLayout()
+        if self.video_panel is not None:
+            top.addWidget(self.video_panel, video_w)          # 视频在左
+            top.addLayout(right, W - video_w)
+        else:
+            top.addLayout(right, 1)
+
         lay = QtWidgets.QVBoxLayout(self)
-        lay.addWidget(self.speed_panel, config.STRETCH_SPEED)
-        lay.addWidget(self.eeg_panel, config.STRETCH_EEG)
+        lay.addLayout(top, 1)
         lay.addLayout(row)
         lay.addLayout(row2)
 
@@ -106,6 +130,24 @@ class MainWindow(QtWidgets.QWidget):
 
         self._on_time(0.0)
         self._refresh_info()
+
+    def _plan_geometry(self):
+        """按屏幕和视频宽高比规划窗口大小与视频列宽度（像素，同时用作 stretch 比例）。"""
+        geo = QtGui.QGuiApplication.primaryScreen().availableGeometry()
+        W = int(geo.width() * config.WINDOW_SCREEN_FRAC[0])
+        H = int(geo.height() * config.WINDOW_SCREEN_FRAC[1])
+        video_w = 0
+        if self.video_panel is not None:
+            avail_h = H - 110                       # 扣除底部控制栏
+            ideal = self.video_panel.aspect * avail_h   # 视频恰好占满高度所需的宽度
+            video_w = int(min(max(ideal, config.VIDEO_MIN_FRAC * W),
+                              config.VIDEO_MAX_FRAC * W))
+        return W, H, video_w
+
+    def closeEvent(self, e):
+        if self.video_panel is not None:
+            self.video_panel.release()
+        super().closeEvent(e)
 
     def _on_slider(self, v):
         if not self._updating:

@@ -34,6 +34,16 @@ UV_PER_SPACING = 20.0         # 初始灵敏度：多少 µV 对应一个通道�
 GAIN_STEP = 1.25               # 每次按 ↑/↓ 的灵敏度倍率
 REMOVE_WINDOW_MEAN = True      # 显示时减去窗口内均值，避免基线漂移把曲线推出画面
 
+# ---- 视频 ----
+def video_path(session):
+    return DATA_ROOT / "videos" / "viz" / f"kinetics_video_grid_layout_{session}.mp4"
+
+VIDEO_OFFSET = 0.0             # 视频 0 秒相对"运动 0 时刻"的偏移 (s)；视频与运动数据对齐时为 0
+VIDEO_MAX_SKIP = 15            # 前进不超过该帧数时用顺序读取，否则 seek
+VIDEO_MIN_FRAC = 0.22          # 视频列占窗口宽度的最小比例
+VIDEO_MAX_FRAC = 0.45          # 视频列占窗口宽度的最大比例
+WINDOW_SCREEN_FRAC = (0.95, 0.92)   # 窗口占屏幕可用区域的 (宽, 高) 比例
+
 # ---- 速度显示 ----
 SPEED_PER_SPACING = 20     # 初始灵敏度：取全部速度值的该百分位作为一个通道间距
 
