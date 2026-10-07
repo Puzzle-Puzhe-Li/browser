@@ -81,7 +81,9 @@ class MainWindow(QtWidgets.QWidget):
             colors=load_colors(config.JOINT_CMAP_PATH),
             t_offset=self.t0 + speed.t_start,
             unit_per_spacing=config.SPEED_PER_SPACING, remove_mean=False,
-            zero_baseline=True, show_time_axis=False, axis_zero=self.t0)
+            zero_baseline=True, show_time_axis=False, axis_zero=self.t0,
+            ylabel="Joint velocity (cm/s)", y_top_pad=config.SPEED_YPAD_TOP)
+
         self.eeg_panel = SignalPanel(
             eeg.data, eeg.names, eeg.fs, self.clock,
             colors=load_colors(config.CHANNEL_CMAP_PATH),
@@ -89,7 +91,9 @@ class MainWindow(QtWidgets.QWidget):
             unit_per_spacing=config.UV_PER_SPACING, remove_mean=config.REMOVE_WINDOW_MEAN,
             zero_baseline=False, show_time_axis=False, axis_zero=self.t0,
             marks=self.blink_times, mark_color=config.BLINK_COLOR,
-            mark_height=config.BLINK_TICK_HEIGHT)
+            mark_height=config.BLINK_TICK_HEIGHT,
+            ylabel="EEG (μV)")
+        
         inv_df = load_involvement_table(config.involvement_path(session))
         self.inv_model = InvolvementModel(inv_df, self.t0, parent=self)
         print(f"[动作类型] {len(self.inv_model.segs)} 段")
@@ -130,8 +134,8 @@ class MainWindow(QtWidgets.QWidget):
 
         self.info = QtWidgets.QLabel()
         self.hint = QtWidgets.QLabel(
-            "空格 播放/暂停   ←/→ ±1 s   Shift+←/→ ±10 s   Ctrl+←/→ ±1 帧   "
-            "↑/↓ 脑电+速度灵敏度   Home/End 首/尾   双击脑电通道名 切换TFR通道   " 
+            "空格 播放/暂停   ←/→ ±1 s   PgUp/PgDn ±10 s   Shift+←/→ 上/下一段起点   Ctrl+←/→ ±1 帧   "
+            "小键盘 +/- 纵轴比例尺   * / 播放速度加/减   Home/End 首/尾   双击脑电通道名 切换TFR通道   "
             "暂停时拖动框选时间段→选择动作类型   Ctrl+Z 撤销   右键色条 导出")
 
         row = QtWidgets.QHBoxLayout()
@@ -293,32 +297,58 @@ class MainWindow(QtWidgets.QWidget):
 
     def _refresh_info(self, *_):
         self.info.setText(
-            f"脑电 {self.eeg_panel.unit_per_spacing:.0f} µV/行   "
+            f"纵轴比例尺  脑电 {self.eeg_panel.unit_per_spacing:.0f} µV/行   "
             f"速度 {self.speed_panel.unit_per_spacing:.3g} cm·s^(-1)/行   "
             f"运动起点 {self.t0:.3f} s ({self.t0_src})")
+
+    def _jump_segment(self, direction):
+        """跳到下一段(direction>0)或上一段(direction<0)的起点。"""
+        starts = sorted(s[0] for s in self.inv_model.segs)
+        t, eps = self.clock.time, 1e-3
+        if direction > 0:
+            cand = [s for s in starts if s > t + eps]
+            target = cand[0] if cand else None
+        else:
+            cand = [s for s in starts if s < t - eps]
+            target = cand[-1] if cand else None
+        if target is not None:
+            self.clock.seek(target)
+
+    def _change_play_speed(self, delta):
+        i = self.speed_box.currentIndex() + delta
+        i = min(max(i, 0), self.speed_box.count() - 1)
+        self.speed_box.setCurrentIndex(i)      # 会触发 clock.set_speed
 
     def keyPressEvent(self, e):
         K = QtCore.Qt.Key
         M = QtCore.Qt.KeyboardModifier
         shift = (e.modifiers() & M.ShiftModifier) == M.ShiftModifier
-        ctrl = (e.modifiers() & M.ControlModifier) == M.ControlModifier        
+        ctrl = (e.modifiers() & M.ControlModifier) == M.ControlModifier
         k = e.key()
         if k == K.Key_Space:
             self.clock.toggle()
         elif ctrl and k == K.Key_Z:
-            self.inv_model.undo()            
+            self.inv_model.undo()
         elif k in (K.Key_Left, K.Key_Right):
             sign = -1 if k == K.Key_Left else 1
             if ctrl:
-                step = 1.0 / self.frame_fps            # 1 帧
+                self.clock.step(sign / self.frame_fps)      # ±1 帧
             elif shift:
-                step = 10.0
+                self._jump_segment(sign)                    # 上/下一段起点
             else:
-                step = 1.0
-            self.clock.step(sign * step)
-        elif k in (K.Key_Up, K.Key_Down):
-            self.speed_panel.change_gain(k == K.Key_Up)
-            self.eeg_panel.change_gain(k == K.Key_Up)
+                self.clock.step(sign * 1.0)                 # ±1 s
+        elif k == K.Key_PageUp:
+            self.clock.step(-10.0)
+        elif k == K.Key_PageDown:
+            self.clock.step(10.0)
+        elif k in (K.Key_Plus, K.Key_Minus):
+            more = (k == K.Key_Plus)                        # + 放大波形，- 缩小
+            self.speed_panel.change_gain(more)
+            self.eeg_panel.change_gain(more)
+        elif k == K.Key_Asterisk:
+            self._change_play_speed(+1)
+        elif k == K.Key_Slash:
+            self._change_play_speed(-1)
         elif k == K.Key_Home:
             self.clock.seek(0)
         elif k == K.Key_End:

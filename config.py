@@ -23,14 +23,14 @@ SAMPLE_START_KEY = "sample_start"   # BDF 标注里代表“运动数据 0 时�
 VIDEO_START_KEY = "video_start"     # BDF 标注里代表"视频 0 秒"的名字
 EEG_OFFSET = 5.0               # 找不到 sample_start 标注时的默认值 (s)
 FPS = 30
-SPEEDS = [0.25, 0.5, 1, 2, 4, 8]
+SPEEDS = [0.25, 0.5, 1, 2, 4, 8, 16, 32]
 
 # ---- 布局 ----(把这几行替换)
 STRETCH_SPEED = 12
 STRETCH_EEG = 36
 STRETCH_INV = 1                
 STRETCH_TFR = 18
-AXIS_WIDTH = 60                # 左侧通道名区域宽度，各面板一致以保证时间轴对齐
+AXIS_WIDTH = 50                # 左侧通道名区域宽度，各面板一致以保证时间轴对齐
 START_MAXIMIZED = True         # 启动时直接最大化
 
 # ---- 动作类型 (involvement) ----
@@ -62,12 +62,13 @@ def sync_model_path(session):
 USE_VIDEO_SYNC = True          # 是否用同步模型的截距修正视频时间轴
 
 VIDEO_OFFSET = 0.0             # 视频 0 秒相对"运动 0 时刻"的偏移 (s)；视频与运动数据对齐时为 0
-VIDEO_MAX_SKIP = 15            # 前进不超过该帧数时用顺序读取，否则 seek
+VIDEO_MAX_SKIP = 40            # 前进不超过该帧数时用顺序读取，否则 seek
 VIDEO_MIN_FRAC = 0.22          # 视频列占窗口宽度的最小比例
 VIDEO_MAX_FRAC = 0.45          # 视频列占窗口宽度的最大比例
 WINDOW_SCREEN_FRAC = (0.95, 0.92)   # 窗口占屏幕可用区域的 (宽, 高) 比例
 
 # ---- 速度显示 ----
+SPEED_YPAD_TOP = 3.0
 SPEED_PER_SPACING = 20     # 初始灵敏度：取全部速度值的该百分位作为一个通道间距
 
 # ---- TFR ----

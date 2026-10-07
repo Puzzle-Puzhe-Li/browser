@@ -78,7 +78,15 @@ class TFRPanel(QtWidgets.QWidget):
         self.plot = pg.PlotWidget()
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(self.plot)
+        lay.setSpacing(0)
+
+        self.title = QtWidgets.QLabel()
+        self.title.setStyleSheet("font-size: 9px;")
+        self.title.setContentsMargins(config.AXIS_WIDTH, 0, 0, 0)
+        lay.addWidget(self.title)
+
+        self.plot = pg.PlotWidget()
+        lay.addWidget(self.plot, 1)
 
         pi = self.plot.getPlotItem()
         pi.setMouseEnabled(False, False)
@@ -90,6 +98,7 @@ class TFRPanel(QtWidgets.QWidget):
             pi.getAxis(side).setStyle(tickFont=font)
         pi.getAxis("left").setWidth(config.AXIS_WIDTH)
         pi.setLabel("bottom", "时间 (s)")
+        pi.setLabel("left", "Frequency (Hz)")
         pi.setYRange(self.freqs[0] - self.df / 2, self.freqs[-1] + self.df / 2, padding=0)
 
         self.img = SmoothImageItem()
@@ -112,8 +121,8 @@ class TFRPanel(QtWidgets.QWidget):
         if name not in self.names:
             return
         self.channel = name
+        self.title.setText(f"TFR channel: <b>{name}</b>")
         self._tfr = self._get_tfr(name)
-        self.plot.getPlotItem().setLabel("left", f"{name} (Hz)")
         self.update_view(self.clock.time)
 
     # ---- 计算 / 缓存 ----
@@ -132,7 +141,7 @@ class TFRPanel(QtWidgets.QWidget):
         else:
             QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
             try:
-                self.plot.getPlotItem().setLabel("left", f"{name} 计算中…")
+                self.title.setText(f"TFR channel: <b>{name}</b> (计算中…)")
                 QtWidgets.QApplication.processEvents()
                 ch = self.names.index(name)
                 tfr = compute_tfr_db(self.data[ch], self.fs, self.freqs,

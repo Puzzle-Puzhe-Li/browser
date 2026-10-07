@@ -51,7 +51,8 @@ class SignalPanel(QtWidgets.QWidget):
     def __init__(self, data, names, fs, clock, colors=None, t_offset=0.0,
                  unit_per_spacing=100.0, remove_mean=False, zero_baseline=False,
                  show_time_axis=True, axis_zero=0.0, 
-                 marks=None, mark_color=(70, 70, 70), mark_height=0.35, parent=None):
+                 marks=None, mark_color=(70, 70, 70), mark_height=0.35,
+                 ylabel=None, y_top_pad=None, parent=None):
         super().__init__(parent)
         self.data = data
         self.names = names
@@ -94,8 +95,12 @@ class SignalPanel(QtWidgets.QWidget):
         font = QtGui.QFont()
         font.setPointSize(5)
         ax.setStyle(tickFont=font)
+        if ylabel:
+            pi.setLabel("left", ylabel)
+
         if zero_baseline:
-            pi.setYRange(-0.6, self.n_ch + 0.6, padding=0)
+            top = self.n_ch - 1 + (y_top_pad if y_top_pad is not None else 0.6)
+            pi.setYRange(-0.6, top, padding=0)
         else:
             pi.setYRange(-1, self.n_ch, padding=0)
 
