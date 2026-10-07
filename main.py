@@ -7,12 +7,15 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import config
 from clock import Clock
 from eeg_loader import load_eeg
-from motion_loader import (load_speed_csv, load_blink_times,
-                           load_video_intercept, load_involvement)
 from signal_panel import SignalPanel, load_colors
 from video_panel import VideoPanel
 from tfr_panel import TFRPanel 
 from involvement_panel import InvolvementPanel
+
+from motion_loader import (load_speed_csv, load_blink_times,
+                           load_video_intercept, load_involvement_table)
+from involvement_model import InvolvementModel
+from selection import SelectionHost, SelectionOverlay, SelectionController
 
 
 class JumpSlider(QtWidgets.QSlider):
@@ -87,11 +90,11 @@ class MainWindow(QtWidgets.QWidget):
             zero_baseline=False, show_time_axis=False, axis_zero=self.t0,
             marks=self.blink_times, mark_color=config.BLINK_COLOR,
             mark_height=config.BLINK_TICK_HEIGHT)
-        inv_s, inv_e, inv_lab, inv_ss = load_involvement(config.involvement_path(session))
-        print(f"[动作类型] {len(inv_lab)} 段，CSV 内 sample_start = {inv_ss:g} s")
-        self.inv_panel = InvolvementPanel(
-            self.t0 + (inv_s - inv_ss), self.t0 + (inv_e - inv_ss), inv_lab,
-            self.clock, axis_zero=self.t0)        
+        inv_df = load_involvement_table(config.involvement_path(session))
+        self.inv_model = InvolvementModel(inv_df, self.t0, parent=self)
+        print(f"[动作类型] {len(self.inv_model.segs)} 段")
+        self.inv_panel = InvolvementPanel(self.inv_model, self.clock,
+                                        axis_zero=self.t0, session=session)      
         self.tfr_panel = TFRPanel(
             eeg.data, eeg.names, eeg.fs, self.clock,
             axis_zero=self.t0, cache_tag=session,
@@ -128,7 +131,8 @@ class MainWindow(QtWidgets.QWidget):
         self.info = QtWidgets.QLabel()
         self.hint = QtWidgets.QLabel(
             "空格 播放/暂停   ←/→ ±1 s   Shift+←/→ ±10 s   Ctrl+←/→ ±1 帧   "
-            "↑/↓ 脑电+速度灵敏度   Home/End 首/尾   双击脑电通道名 切换TFR通道")
+            "↑/↓ 脑电+速度灵敏度   Home/End 首/尾   双击脑电通道名 切换TFR通道   " 
+            "暂停时拖动框选时间段→选择动作类型   Ctrl+Z 撤销   右键色条 导出")
 
         row = QtWidgets.QHBoxLayout()
         for w in (self.btn, self.slider, self.time_label, self.speed_box, self.mean_chk):
@@ -137,7 +141,9 @@ class MainWindow(QtWidgets.QWidget):
         row2.addWidget(self.hint, 1)
         row2.addWidget(self.info)
 
-        right = QtWidgets.QVBoxLayout()
+        self.right_w = SelectionHost()
+        right = QtWidgets.QVBoxLayout(self.right_w)
+        right.setContentsMargins(0, 0, 0, 0)
         right.addWidget(self.speed_panel, config.STRETCH_SPEED)
         right.addWidget(self.eeg_panel, config.STRETCH_EEG)
         right.addWidget(self.inv_panel, config.STRETCH_INV)
@@ -145,10 +151,21 @@ class MainWindow(QtWidgets.QWidget):
 
         top = QtWidgets.QHBoxLayout()
         if self.video_panel is not None:
-            top.addWidget(self.video_panel, video_w)          # 视频在左
-            top.addLayout(right, W - video_w)
+            top.addWidget(self.video_panel, video_w)
+            top.addWidget(self.right_w, W - video_w)
         else:
-            top.addLayout(right, 1)
+            top.addWidget(self.right_w, 1)
+
+        # 框选
+        self.overlay = SelectionOverlay(self.right_w, self.eeg_panel, self.t0)
+        self.selector = SelectionController(
+            (self.speed_panel, self.eeg_panel, self.inv_panel, self.tfr_panel),
+            self.eeg_panel, self.overlay, self.clock, self.t0, eeg.duration, parent=self)
+        self.selector.selectionMade.connect(self._on_selection)
+        self.clock.timeChanged.connect(lambda _: self.overlay.set_selection(None))
+        self.clock.playingChanged.connect(lambda _: self.overlay.set_selection(None))
+        self.inv_model.dirtyChanged.connect(self._update_title)
+        self._session = session
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.addLayout(top, 1)
@@ -170,6 +187,29 @@ class MainWindow(QtWidgets.QWidget):
         self._on_time(0.0)
         self._refresh_info()
         self.setMinimumSize(640, 480)
+
+    def _update_title(self, dirty=None):
+        d = self.inv_model.dirty if dirty is None else dirty
+        self.setWindowTitle(f"EEG Browser - session {self._session}" + (" *" if d else ""))
+
+    def _on_selection(self, a, b, gp):
+        # 延后到事件循环里弹菜单，避免在 eventFilter 内阻塞
+        QtCore.QTimer.singleShot(0, lambda: self._show_assign_menu(a, b, gp))
+
+    def _show_assign_menu(self, a, b, gp):
+        m = QtWidgets.QMenu(self)
+        title = m.addAction(f"{a - self.t0:.2f} – {b - self.t0:.2f} s（{b - a:.2f} s）设为：")
+        title.setEnabled(False)
+        m.addSeparator()
+        for name in config.INVOLVEMENT_ORDER:
+            pm = QtGui.QPixmap(12, 12)
+            pm.fill(QtGui.QColor(*self.inv_panel.color_of(name)))
+            act = m.addAction(QtGui.QIcon(pm), name)
+            act.triggered.connect(lambda _=False, n=name: self.inv_model.assign(a, b, n))
+        m.addSeparator()
+        m.addAction("取消")
+        m.exec(gp)
+        self.overlay.set_selection(None)
 
     def place_normal(self):
         """show 之前调用：把"正常（非最大化）状态"的大小和位置设成屏幕可用区域内居中。"""
@@ -265,6 +305,8 @@ class MainWindow(QtWidgets.QWidget):
         k = e.key()
         if k == K.Key_Space:
             self.clock.toggle()
+        elif ctrl and k == K.Key_Z:
+            self.inv_model.undo()            
         elif k in (K.Key_Left, K.Key_Right):
             sign = -1 if k == K.Key_Left else 1
             if ctrl:
@@ -284,6 +326,16 @@ class MainWindow(QtWidgets.QWidget):
         else:
             super().keyPressEvent(e)
 
+    def closeEvent(self, e):
+        if self.inv_model.dirty:
+            r = QtWidgets.QMessageBox.question(
+                self, "有未导出的修改", "动作类型已修改但尚未导出，确定退出吗？")
+            if r != QtWidgets.QMessageBox.StandardButton.Yes:
+                e.ignore()
+                return
+        if self.video_panel is not None:
+            self.video_panel.release()
+        super().closeEvent(e)
 
 def load_with_dialog(path):
     dlg = QtWidgets.QProgressDialog("正在加载…", "取消", 0, 100)

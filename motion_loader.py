@@ -86,3 +86,11 @@ def load_involvement(path):
     ok = np.isfinite(starts) & np.isfinite(durs)
     keep = [i for i in range(len(labels)) if ok[i]]
     return starts[ok], (starts + durs)[ok], [labels[i] for i in keep], ss_onset
+
+def load_involvement_table(path):
+    """读取 involvement 原始表（保留所有列）。失败返回 None。"""
+    try:
+        return pd.read_csv(path, encoding="utf-8-sig")
+    except Exception as ex:
+        print(f"[动作类型] 读取失败: {ex}")
+        return None
