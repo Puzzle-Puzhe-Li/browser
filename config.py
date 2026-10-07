@@ -26,13 +26,14 @@ FPS = 30
 SPEEDS = [0.25, 0.5, 1, 2, 4, 8]
 
 # ---- 布局 ----
-STRETCH_SPEED = 1              # 速度:脑电 的纵向比例（之后加 TFR 为 1:3:2）
+STRETCH_SPEED = 1              # 速度:脑电 的纵向比例（之后加 TFR 为 1:3:1.5）
 STRETCH_EEG = 3
+STRETCH_TFR = 1.5              # TFR 的纵向比例（速度:脑电:TFR = 1:3:1.5）
 AXIS_WIDTH = 90                # 左侧通道名区域宽度，各面板一致以保证时间轴对齐
 START_MAXIMIZED = True         # 启动时直接最大化
 
 # ---- 脑电显示 ----
-UV_PER_SPACING = 20.0         # 初始灵敏度：多少 µV 对应一个通道间距
+UV_PER_SPACING = 20.0          # 初始灵敏度：多少 µV 对应一个通道间距
 GAIN_STEP = 1.25               # 每次按 ↑/↓ 的灵敏度倍率
 REMOVE_WINDOW_MEAN = True      # 显示时减去窗口内均值，避免基线漂移把曲线推出画面
 
@@ -60,6 +61,14 @@ WINDOW_SCREEN_FRAC = (0.95, 0.92)   # 窗口占屏幕可用区域的 (宽, 高) 
 
 # ---- 速度显示 ----
 SPEED_PER_SPACING = 20     # 初始灵敏度：取全部速度值的该百分位作为一个通道间距
+
+# ---- TFR ----
+import numpy as np
+TFR_FREQS = np.arange(2, 150, 2)       # 频率 (Hz)
+TFR_N_CYCLES_RANGE = (3, 15)           # n_cycles = freqs/2，并限制在该范围内
+TFR_FS = 50                            # TFR 时间分辨率 (Hz)，须能整除 TARGET_FS
+TFR_DB_RANGE = (-120, -80)             # 色标范围 (dB, 相对 1 V²)
+DEFAULT_TFR_CHANNEL = "L12"
 
 # ---- 颜色 ----
 LINE_COLOR = (30, 30, 30)        # 找不到颜色时的默认线色

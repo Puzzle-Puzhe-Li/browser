@@ -10,6 +10,7 @@ from eeg_loader import load_eeg
 from motion_loader import load_speed_csv, load_blink_times, load_video_intercept
 from signal_panel import SignalPanel, load_colors
 from video_panel import VideoPanel
+from tfr_panel import TFRPanel          # 新增
 
 
 class JumpSlider(QtWidgets.QSlider):
@@ -81,11 +82,15 @@ class MainWindow(QtWidgets.QWidget):
             colors=load_colors(config.CHANNEL_CMAP_PATH),
             t_offset=0.0,
             unit_per_spacing=config.UV_PER_SPACING, remove_mean=config.REMOVE_WINDOW_MEAN,
-            zero_baseline=False, show_time_axis=True, axis_zero=self.t0,
+            zero_baseline=False, show_time_axis=False, axis_zero=self.t0,
             marks=self.blink_times, mark_color=config.BLINK_COLOR,
             mark_height=config.BLINK_TICK_HEIGHT)
+        self.tfr_panel = TFRPanel(
+            eeg.data, eeg.names, eeg.fs, self.clock,
+            axis_zero=self.t0, cache_tag=session,
+            channel=config.DEFAULT_TFR_CHANNEL)        
         
-        for p in (self.speed_panel, self.eeg_panel):
+        for p in (self.speed_panel, self.eeg_panel, self.tfr_panel):
             p.setMinimumSize(100, 50)
 
         self._updating = False
@@ -112,13 +117,20 @@ class MainWindow(QtWidgets.QWidget):
         self.mean_chk.setChecked(config.REMOVE_WINDOW_MEAN)
         self.mean_chk.setFocusPolicy(NF)
 
+        self.tfr_box = QtWidgets.QComboBox()
+        self.tfr_box.setFocusPolicy(NF)
+        self.tfr_box.addItems([n.strip() for n in eeg.names])
+        self.tfr_box.setCurrentText(self.tfr_panel.channel)
+        self.tfr_box.setToolTip("TFR 通道")        
+
         self.info = QtWidgets.QLabel()
         self.hint = QtWidgets.QLabel(
             "空格 播放/暂停   ←/→ ±1 s   Shift+←/→ ±10 s   Ctrl+←/→ ±1 帧   "
             "↑/↓ 脑电+速度灵敏度   Home/End 首/尾")
 
         row = QtWidgets.QHBoxLayout()
-        for w in (self.btn, self.slider, self.time_label, self.speed_box, self.mean_chk):
+        for w in (self.btn, self.slider, self.time_label, self.speed_box,
+                  self.mean_chk, QtWidgets.QLabel("TFR 通道"), self.tfr_box):
             row.addWidget(w, 1 if w is self.slider else 0)
         row2 = QtWidgets.QHBoxLayout()
         row2.addWidget(self.hint, 1)
@@ -127,6 +139,7 @@ class MainWindow(QtWidgets.QWidget):
         right = QtWidgets.QVBoxLayout()
         right.addWidget(self.speed_panel, config.STRETCH_SPEED)
         right.addWidget(self.eeg_panel, config.STRETCH_EEG)
+        right.addWidget(self.tfr_panel, config.STRETCH_TFR)
 
         top = QtWidgets.QHBoxLayout()
         if self.video_panel is not None:
@@ -150,6 +163,7 @@ class MainWindow(QtWidgets.QWidget):
             lambda p: self.btn.setText("⏸ 暂停" if p else "▶ 播放"))
         self.eeg_panel.gainChanged.connect(self._refresh_info)
         self.speed_panel.gainChanged.connect(self._refresh_info)
+        self.tfr_box.currentTextChanged.connect(self.tfr_panel.set_channel)        
 
         self._on_time(0.0)
         self._refresh_info()
