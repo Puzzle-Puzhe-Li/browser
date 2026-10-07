@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from pyqtgraph.Qt import QtCore
 
+MERGE_EPS = 1e-6   # 两段首尾相差不超过该值（秒）即视为相连
 
 class InvolvementModel(QtCore.QObject):
     changed = QtCore.Signal()          # 分段变化 → 面板重绘
@@ -56,21 +57,48 @@ class InvolvementModel(QtCore.QObject):
 
     # ---- 编辑 ----
     def assign(self, t0, t1, label):
-        """把 [t0, t1] 区间设为 label：与之重叠的旧分段被裁剪/切开，新区间覆盖其上。"""
+        """把 [t0, t1] 区间设为 label：与之重叠的旧分段被裁剪/切开，新区间覆盖其上；
+        若新区间与前/后相邻且类型相同的分段首尾相连，则自动合并为一段。"""
         if t1 - t0 <= 0:
             return
-        self._undo.append(list(self.segs))
-        out = []
+
+        pre, post = [], []                 # 新区间左侧 / 右侧保留下来的分段
         for s, e, l, meta in self.segs:
-            if e <= t0 or s >= t1:
-                out.append((s, e, l, meta))
-                continue
-            if s < t0:
-                out.append((s, t0, l, meta))
-            if e > t1:
-                out.append((t1, e, l, meta))
-        out.append((t0, t1, label, {"Annotation": "manual_edit"}))
+            if e <= t0:
+                pre.append((s, e, l, meta))
+            elif s >= t1:
+                post.append((s, e, l, meta))
+            else:                          # 与新区间重叠：裁剪 / 切开
+                if s < t0:
+                    pre.append((s, t0, l, meta))
+                if e > t1:
+                    post.append((t1, e, l, meta))
+
+        ns, ne = t0, t1
+        merged_meta = None
+        # 向左吞并：类型相同且首尾相连
+        while pre and pre[-1][2] == label and abs(pre[-1][1] - ns) <= MERGE_EPS:
+            s, e, l, meta = pre.pop()
+            ns = min(ns, s)
+            merged_meta = dict(meta)       # 以最左侧分段的附加信息为准
+        # 向右吞并
+        while post and post[0][2] == label and abs(post[0][0] - ne) <= MERGE_EPS:
+            s, e, l, meta = post.pop(0)
+            ne = max(ne, e)
+            if merged_meta is None:
+                merged_meta = dict(meta)
+
+        if merged_meta is None:
+            merged_meta = {"Annotation": "manual_edit"}
+        else:
+            merged_meta["Annotation"] = "manual_edit"
+
+        out = pre + [(ns, ne, label, merged_meta)] + post
         out.sort(key=lambda x: x[0])
+        if out == self.segs:               # 没有任何实际变化（如在同类型区域内重复设置）
+            return
+
+        self._undo.append(list(self.segs))
         self.segs = out
         self._set_dirty(True)
         self.changed.emit()
