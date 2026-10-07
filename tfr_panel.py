@@ -12,6 +12,12 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 import config
 
+class SmoothImageItem(pg.ImageItem):
+    """绘制时启用平滑插值（类似 gouraud shading）。"""
+
+    def paint(self, p, *args):
+        p.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
+        super().paint(p, *args)
 
 def jet_lut(n=256):
     """与 matplotlib 'jet' 近似的查找表，返回 (n, 3) uint8。"""
@@ -86,7 +92,7 @@ class TFRPanel(QtWidgets.QWidget):
         pi.setLabel("bottom", "时间 (s)")
         pi.setYRange(self.freqs[0] - self.df / 2, self.freqs[-1] + self.df / 2, padding=0)
 
-        self.img = pg.ImageItem()
+        self.img = SmoothImageItem()
         self.img.setLookupTable(jet_lut())
         self.img.setLevels(config.TFR_DB_RANGE)
         pi.addItem(self.img)
