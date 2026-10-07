@@ -8,7 +8,7 @@ import hashlib
 import numpy as np
 import pyqtgraph as pg
 from mne.time_frequency import tfr_array_morlet
-from pyqtgraph.Qt import QtCore, QtWidgets
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 import config
 
@@ -78,6 +78,10 @@ class TFRPanel(QtWidgets.QWidget):
         pi.setMouseEnabled(False, False)
         pi.setMenuEnabled(False)
         pi.hideButtons()
+        font = QtGui.QFont()
+        font.setPointSize(5)                      # 与脑电通道名一致
+        for side in ("left", "bottom"):
+            pi.getAxis(side).setStyle(tickFont=font)
         pi.getAxis("left").setWidth(config.AXIS_WIDTH)
         pi.setLabel("bottom", "时间 (s)")
         pi.setYRange(self.freqs[0] - self.df / 2, self.freqs[-1] + self.df / 2, padding=0)
