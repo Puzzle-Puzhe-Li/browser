@@ -24,9 +24,29 @@ def load_colors(path):
         out[name] = tuple(int(round(255 * min(max(float(c[k]), 0.0), 1.0))) for k in ("0", "1", "2"))
     return out
 
+class ClickableAxis(pg.AxisItem):
+    """左侧通道名坐标轴：双击某一行，回调该行对应的名字。"""
+
+    def __init__(self, *args, names=None, on_double_click=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._names = list(names or [])
+        self._cb = on_double_click
+
+    def mouseClickEvent(self, ev):
+        if ev.button() == QtCore.Qt.MouseButton.LeftButton and ev.double() and self._cb:
+            vb = self.linkedView()
+            if vb is not None and self._names:
+                y = vb.mapSceneToView(ev.scenePos()).y()
+                row = len(self._names) - 1 - int(round(y))      # 第 0 通道在最上方
+                if 0 <= row < len(self._names):
+                    self._cb(self._names[row].strip())
+            ev.accept()
+            return
+        super().mouseClickEvent(ev)
 
 class SignalPanel(QtWidgets.QWidget):
     gainChanged = QtCore.Signal(float)     # 当前灵敏度 (数据单位 / 通道间距)
+    channelDoubleClicked = QtCore.Signal(str)   # 双击左侧通道名
 
     def __init__(self, data, names, fs, clock, colors=None, t_offset=0.0,
                  unit_per_spacing=100.0, remove_mean=False, zero_baseline=False,
@@ -48,7 +68,9 @@ class SignalPanel(QtWidgets.QWidget):
         # 第 0 通道在最上方
         self.offsets = np.arange(self.n_ch - 1, -1, -1, dtype=np.float32)[:, None]
 
-        self.plot = pg.PlotWidget()
+        left_axis = ClickableAxis("left", names=names,
+                                  on_double_click=self.channelDoubleClicked.emit)
+        self.plot = pg.PlotWidget(axisItems={"left": left_axis})
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self.plot)
@@ -94,7 +116,7 @@ class SignalPanel(QtWidgets.QWidget):
             self.mark_item = pg.PlotCurveItem(xs, ys, connect="pairs",
                                               pen=pg.mkPen(mark_color, width=2))
             pi.addItem(self.mark_item)        
-                
+
         self.playhead = pg.InfiniteLine(pos=0, angle=90, movable=False,
                                         pen=pg.mkPen("r", width=1.5))
         pi.addItem(self.playhead)

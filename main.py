@@ -115,22 +115,15 @@ class MainWindow(QtWidgets.QWidget):
 
         self.mean_chk = QtWidgets.QCheckBox("脑电去窗口均值")
         self.mean_chk.setChecked(config.REMOVE_WINDOW_MEAN)
-        self.mean_chk.setFocusPolicy(NF)
-
-        self.tfr_box = QtWidgets.QComboBox()
-        self.tfr_box.setFocusPolicy(NF)
-        self.tfr_box.addItems([n.strip() for n in eeg.names])
-        self.tfr_box.setCurrentText(self.tfr_panel.channel)
-        self.tfr_box.setToolTip("TFR 通道")        
+        self.mean_chk.setFocusPolicy(NF)  
 
         self.info = QtWidgets.QLabel()
         self.hint = QtWidgets.QLabel(
             "空格 播放/暂停   ←/→ ±1 s   Shift+←/→ ±10 s   Ctrl+←/→ ±1 帧   "
-            "↑/↓ 脑电+速度灵敏度   Home/End 首/尾")
+            "↑/↓ 脑电+速度灵敏度   Home/End 首/尾   双击脑电通道名 切换TFR通道")
 
         row = QtWidgets.QHBoxLayout()
-        for w in (self.btn, self.slider, self.time_label, self.speed_box,
-                  self.mean_chk, QtWidgets.QLabel("TFR 通道"), self.tfr_box):
+        for w in (self.btn, self.slider, self.time_label, self.speed_box, self.mean_chk):
             row.addWidget(w, 1 if w is self.slider else 0)
         row2 = QtWidgets.QHBoxLayout()
         row2.addWidget(self.hint, 1)
@@ -163,7 +156,7 @@ class MainWindow(QtWidgets.QWidget):
             lambda p: self.btn.setText("⏸ 暂停" if p else "▶ 播放"))
         self.eeg_panel.gainChanged.connect(self._refresh_info)
         self.speed_panel.gainChanged.connect(self._refresh_info)
-        self.tfr_box.currentTextChanged.connect(self.tfr_panel.set_channel)        
+        self.eeg_panel.channelDoubleClicked.connect(self.tfr_panel.set_channel)
 
         self._on_time(0.0)
         self._refresh_info()
