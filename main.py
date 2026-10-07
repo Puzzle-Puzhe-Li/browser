@@ -136,7 +136,7 @@ class MainWindow(QtWidgets.QWidget):
         self.hint = QtWidgets.QLabel(
             "空格 播放/暂停   ←/→ ±1 s   PgUp/PgDn ±10 s   Shift+←/→ 上/下一段起点   Ctrl+←/→ ±1 帧   "
             "小键盘 +/- 纵轴比例尺   * / 播放速度加/减   Home/End 首/尾   双击脑电通道名 切换TFR通道   "
-            "暂停时拖动框选时间段→选择动作类型   Ctrl+Z 撤销   右键色条 导出")
+            "暂停时拖动框选时间段→选择动作类型   Ctrl+Z 撤销   右键运动类型栏 导出/导入")
 
         row = QtWidgets.QHBoxLayout()
         for w in (self.btn, self.slider, self.time_label, self.speed_box, self.mean_chk):

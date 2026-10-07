@@ -4,6 +4,8 @@ import pandas as pd
 from pyqtgraph.Qt import QtCore
 
 MERGE_EPS = 1e-6   # 两段首尾相差不超过该值（秒）即视为相连
+REQUIRED_COLS = {"Onset", "Duration", "Annotation", "Involvement"}
+
 
 class InvolvementModel(QtCore.QObject):
     changed = QtCore.Signal()          # 分段变化 → 面板重绘
@@ -20,30 +22,45 @@ class InvolvementModel(QtCore.QObject):
         self._undo = []
         self.dirty = False
 
-        need = {"Onset", "Duration", "Annotation", "Involvement"}
         if df is None:
             return
+        try:
+            self._apply(self._parse(df))
+        except ValueError as ex:
+            print(f"[动作类型] {ex}")
+
+    # ---- 解析 / 快照 ----
+    def _parse(self, df):
+        """把表解析成 (columns, others, segs, ss_onset)；格式不对抛 ValueError，不修改自身状态。"""
         df = df.copy()
         df.columns = [str(c).strip() for c in df.columns]
-        if not need.issubset(df.columns):
-            print(f"[动作类型] 缺少列 {need - set(df.columns)}")
-            return
-        self.columns = list(df.columns)
+        if not REQUIRED_COLS.issubset(df.columns):
+            raise ValueError(f"缺少列 {REQUIRED_COLS - set(df.columns)}，现有列: {list(df.columns)}")
+        columns = list(df.columns)
 
         ann = df["Annotation"].astype(str).str.strip().str.lower()
         is_ss = ann == "sample_start"
-        if is_ss.any():
-            self.ss_onset = float(df.loc[is_ss, "Onset"].iloc[0])
+        ss_onset = float(pd.to_numeric(df.loc[is_ss, "Onset"], errors="coerce").iloc[0]) if is_ss.any() else 0.0
+        if not np.isfinite(ss_onset):
+            ss_onset = 0.0
         onset = pd.to_numeric(df["Onset"], errors="coerce")
         dur = pd.to_numeric(df["Duration"], errors="coerce")
         is_seg = ~is_ss & df["Involvement"].notna() & onset.notna() & dur.notna()
 
-        self.others = df[~is_seg].copy()
+        others = df[~is_seg].copy()
+        segs = []
         for idx in df.index[is_seg]:
             meta = df.loc[idx].drop(["Onset", "Duration", "Involvement"]).to_dict()
-            s = self.t0 + float(onset[idx]) - self.ss_onset
-            self.segs.append((s, s + float(dur[idx]), str(df.at[idx, "Involvement"]).strip(), meta))
-        self.segs.sort(key=lambda x: x[0])
+            s = self.t0 + float(onset[idx]) - ss_onset
+            segs.append((s, s + float(dur[idx]), str(df.at[idx, "Involvement"]).strip(), meta))
+        segs.sort(key=lambda x: x[0])
+        return columns, others, segs, ss_onset
+
+    def _apply(self, state):
+        self.columns, self.others, self.segs, self.ss_onset = state
+
+    def _snapshot(self):
+        return (list(self.columns), self.others.copy(), list(self.segs), self.ss_onset)
 
     # ---- 读取 ----
     def arrays(self):
@@ -76,12 +93,10 @@ class InvolvementModel(QtCore.QObject):
 
         ns, ne = t0, t1
         merged_meta = None
-        # 向左吞并：类型相同且首尾相连
         while pre and pre[-1][2] == label and abs(pre[-1][1] - ns) <= MERGE_EPS:
             s, e, l, meta = pre.pop()
             ns = min(ns, s)
-            merged_meta = dict(meta)       # 以最左侧分段的附加信息为准
-        # 向右吞并
+            merged_meta = dict(meta)
         while post and post[0][2] == label and abs(post[0][0] - ne) <= MERGE_EPS:
             s, e, l, meta = post.pop(0)
             ne = max(ne, e)
@@ -95,17 +110,17 @@ class InvolvementModel(QtCore.QObject):
 
         out = pre + [(ns, ne, label, merged_meta)] + post
         out.sort(key=lambda x: x[0])
-        if out == self.segs:               # 没有任何实际变化（如在同类型区域内重复设置）
+        if out == self.segs:
             return
 
-        self._undo.append(list(self.segs))
+        self._undo.append(self._snapshot())
         self.segs = out
         self._set_dirty(True)
         self.changed.emit()
 
     def undo(self):
         if self._undo:
-            self.segs = self._undo.pop()
+            self._apply(self._undo.pop())
             self._set_dirty(True)
             self.changed.emit()
 
@@ -114,7 +129,16 @@ class InvolvementModel(QtCore.QObject):
             self.dirty = v
             self.dirtyChanged.emit(v)
 
-    # ---- 导出 ----
+    # ---- 导入 / 导出 ----
+    def import_df(self, df):
+        """用导入的表替换当前全部分段（可撤销）。格式不对抛 ValueError。"""
+        state = self._parse(df)
+        self._undo.append(self._snapshot())
+        self._apply(state)
+        self._set_dirty(False)             # 刚从文件读入，与磁盘一致
+        self.changed.emit()
+        return len(self.segs)
+
     def to_dataframe(self):
         rows = []
         for s, e, l, meta in self.segs:
@@ -131,5 +155,6 @@ class InvolvementModel(QtCore.QObject):
         return df[self.columns]
 
     def export(self, path):
-        self.to_dataframe().to_excel(path, index=False)
+        # utf-8-sig：Excel 直接打开不乱码，pandas 用 encoding="utf-8-sig" 也能读回
+        self.to_dataframe().to_csv(path, index=False, encoding="utf-8-sig")
         self._set_dirty(False)

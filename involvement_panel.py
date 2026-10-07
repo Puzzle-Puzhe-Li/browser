@@ -6,6 +6,9 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import config
 from signal_panel import load_colors
 
+from pathlib import Path
+import pandas as pd
+
 
 class InvolvementPanel(QtWidgets.QWidget):
     def __init__(self, model, clock, axis_zero=0.0, session="", parent=None):
@@ -95,18 +98,44 @@ class InvolvementPanel(QtWidgets.QWidget):
         a_undo = m.addAction("撤销上一次修改 (Ctrl+Z)")
         a_undo.setEnabled(self.model.can_undo)
         a_undo.triggered.connect(self.model.undo)
-        a_exp = m.addAction(f"导出 involvement_{self.session}_edited.xlsx …")
+        m.addSeparator()
+        a_imp = m.addAction("导入动作类型表 (csv) …")
+        a_imp.triggered.connect(self.import_dialog)
+        a_exp = m.addAction(f"导出 involvement_{self.session}_edited.csv …")
         a_exp.triggered.connect(self.export_dialog)
         m.exec(gp)
 
-    def export_dialog(self):
-        default = config.involvement_path(self.session).parent / f"involvement_{self.session}_edited.xlsx"
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "导出动作类型", str(default), "Excel (*.xlsx)")
+    def import_dialog(self):
+        if self.model.dirty:
+            r = QtWidgets.QMessageBox.question(
+                self, "有未导出的修改",
+                "当前修改尚未导出，导入会替换它们（之后仍可 Ctrl+Z 撤销）。继续吗？")
+            if r != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+        start_dir = str(config.involvement_path(self.session).parent)
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "导入动作类型", start_dir, "表格 (*.csv *.xlsx);;CSV (*.csv);;Excel (*.xlsx)")
         if not path:
             return
-        if not path.lower().endswith(".xlsx"):
-            path += ".xlsx"
+        try:
+            if Path(path).suffix.lower() == ".xlsx":       # 兼容之前导出的 xlsx
+                df = pd.read_excel(path)
+            else:
+                df = pd.read_csv(path, encoding="utf-8-sig")
+            n = self.model.import_df(df)
+        except Exception as ex:
+            QtWidgets.QMessageBox.critical(self, "导入失败", str(ex))
+            return
+        QtWidgets.QMessageBox.information(self, "导入完成", f"已导入 {n} 个分段：\n{path}")
+
+    def export_dialog(self):
+        default = config.involvement_path(self.session).parent / f"involvement_{self.session}_edited.csv"
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "导出动作类型", str(default), "CSV (*.csv)")
+        if not path:
+            return
+        if not path.lower().endswith(".csv"):
+            path += ".csv"
         try:
             self.model.export(path)
         except Exception as ex:

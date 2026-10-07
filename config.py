@@ -30,7 +30,7 @@ STRETCH_SPEED = 12
 STRETCH_EEG = 36
 STRETCH_INV = 1                
 STRETCH_TFR = 18
-AXIS_WIDTH = 50                # 左侧通道名区域宽度，各面板一致以保证时间轴对齐
+AXIS_WIDTH = 70                # 左侧通道名区域宽度，各面板一致以保证时间轴对齐
 START_MAXIMIZED = True         # 启动时直接最大化
 
 # ---- 动作类型 (involvement) ----
