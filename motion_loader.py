@@ -56,3 +56,33 @@ def load_video_intercept(path):
     except Exception as ex:
         print(f"[同步] 读取失败，截距按 0 处理: {ex}")
         return 0.0
+
+
+def load_involvement(path):
+    """读取 involvement 表。返回 (starts, ends, labels, ss_onset)：
+    时间均为 CSV 自己的时间轴（秒）；ss_onset 为 sample_start 行的 Onset。
+    失败返回空结果。"""
+    try:
+        df = pd.read_csv(path, encoding="utf-8-sig")
+    except Exception as ex:
+        print(f"[动作类型] 读取失败: {ex}")
+        return np.array([]), np.array([]), [], 0.0
+    df.columns = [str(c).strip() for c in df.columns]
+    need = {"Onset", "Duration", "Annotation", "Involvement"}
+    if not need.issubset(df.columns):
+        print(f"[动作类型] 缺少列 {need - set(df.columns)}，现有列: {list(df.columns)}")
+        return np.array([]), np.array([]), [], 0.0
+
+    ann = df["Annotation"].astype(str).str.strip().str.lower()
+    is_ss = ann == "sample_start"
+    ss_onset = float(df.loc[is_ss, "Onset"].iloc[0]) if is_ss.any() else 0.0
+    if not is_ss.any():
+        print("[动作类型] 表中没有 sample_start 行，按 0 处理")
+
+    d = df[~is_ss & df["Involvement"].notna()]
+    starts = pd.to_numeric(d["Onset"], errors="coerce").to_numpy(dtype=float)
+    durs = pd.to_numeric(d["Duration"], errors="coerce").to_numpy(dtype=float)
+    labels = [str(s).strip() for s in d["Involvement"]]
+    ok = np.isfinite(starts) & np.isfinite(durs)
+    keep = [i for i in range(len(labels)) if ok[i]]
+    return starts[ok], (starts + durs)[ok], [labels[i] for i in keep], ss_onset

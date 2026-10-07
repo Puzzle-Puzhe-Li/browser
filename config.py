@@ -25,12 +25,20 @@ EEG_OFFSET = 5.0               # 找不到 sample_start 标注时的默认值 (s
 FPS = 30
 SPEEDS = [0.25, 0.5, 1, 2, 4, 8]
 
-# ---- 布局 ----
-STRETCH_SPEED = 2              # 速度:脑电 的纵向比例（之后加 TFR 为 2:6:3）
-STRETCH_EEG = 6
-STRETCH_TFR = 3              # TFR 的纵向比例（速度:脑电:TFR = 2:6:3）
-AXIS_WIDTH = 90                # 左侧通道名区域宽度，各面板一致以保证时间轴对齐
+# ---- 布局 ----(把这几行替换)
+STRETCH_SPEED = 12
+STRETCH_EEG = 36
+STRETCH_INV = 1                
+STRETCH_TFR = 18
+AXIS_WIDTH = 60                # 左侧通道名区域宽度，各面板一致以保证时间轴对齐
 START_MAXIMIZED = True         # 启动时直接最大化
+
+# ---- 动作类型 (involvement) ----
+def involvement_path(session):
+    return DATA_ROOT / "videos" / f"involvement_{session}_sorted2.csv"
+
+INVOLVEMENT_ORDER = ["Resting", "Partial-body", "Whole-body"]   # 图例顺序
+INVOLVEMENT_DEFAULT_COLOR = (200, 200, 200)                     # 未知类别的颜色
 
 # ---- 脑电显示 ----
 UV_PER_SPACING = 20.0          # 初始灵敏度：多少 µV 对应一个通道间距
@@ -75,4 +83,6 @@ LINE_COLOR = (30, 30, 30)        # 找不到颜色时的默认线色
 _ROOT = Path(__file__).resolve().parent
 CHANNEL_CMAP_PATH = _ROOT / "channel_cmap.json"   # 脑电通道颜色表
 JOINT_CMAP_PATH = _ROOT / "joint_cmap.json"       # 关节颜色表
+INVOLVEMENT_CMAP_PATH = _ROOT / "involvement_cmap.json"
+
 USE_OPENGL = False             # 曲线卡顿时可尝试改 True

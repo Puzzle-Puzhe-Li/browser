@@ -7,10 +7,12 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import config
 from clock import Clock
 from eeg_loader import load_eeg
-from motion_loader import load_speed_csv, load_blink_times, load_video_intercept
+from motion_loader import (load_speed_csv, load_blink_times,
+                           load_video_intercept, load_involvement)
 from signal_panel import SignalPanel, load_colors
 from video_panel import VideoPanel
-from tfr_panel import TFRPanel          # 新增
+from tfr_panel import TFRPanel 
+from involvement_panel import InvolvementPanel
 
 
 class JumpSlider(QtWidgets.QSlider):
@@ -85,6 +87,11 @@ class MainWindow(QtWidgets.QWidget):
             zero_baseline=False, show_time_axis=False, axis_zero=self.t0,
             marks=self.blink_times, mark_color=config.BLINK_COLOR,
             mark_height=config.BLINK_TICK_HEIGHT)
+        inv_s, inv_e, inv_lab, inv_ss = load_involvement(config.involvement_path(session))
+        print(f"[动作类型] {len(inv_lab)} 段，CSV 内 sample_start = {inv_ss:g} s")
+        self.inv_panel = InvolvementPanel(
+            self.t0 + (inv_s - inv_ss), self.t0 + (inv_e - inv_ss), inv_lab,
+            self.clock, axis_zero=self.t0)        
         self.tfr_panel = TFRPanel(
             eeg.data, eeg.names, eeg.fs, self.clock,
             axis_zero=self.t0, cache_tag=session,
@@ -92,6 +99,7 @@ class MainWindow(QtWidgets.QWidget):
         
         for p in (self.speed_panel, self.eeg_panel, self.tfr_panel):
             p.setMinimumSize(100, 50)
+        self.inv_panel.setMinimumSize(100, 28)      # 新增
 
         self._updating = False
         NF = QtCore.Qt.FocusPolicy.NoFocus     # 让方向键、空格始终由主窗口接收
@@ -132,6 +140,7 @@ class MainWindow(QtWidgets.QWidget):
         right = QtWidgets.QVBoxLayout()
         right.addWidget(self.speed_panel, config.STRETCH_SPEED)
         right.addWidget(self.eeg_panel, config.STRETCH_EEG)
+        right.addWidget(self.inv_panel, config.STRETCH_INV)
         right.addWidget(self.tfr_panel, config.STRETCH_TFR)
 
         top = QtWidgets.QHBoxLayout()
