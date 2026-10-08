@@ -26,10 +26,11 @@ FPS = 30
 SPEEDS = [0.25, 0.5, 1, 2, 4, 8, 16, 32]
 
 # ---- 布局 ----(把这几行替换)
-STRETCH_SPEED = 12
-STRETCH_EEG = 36
+STRETCH_SPEED = 10
+STRETCH_EEG = 32
+STRETCH_ICA = 11
 STRETCH_INV = 1                
-STRETCH_TFR = 18
+STRETCH_TFR = 13
 AXIS_WIDTH = 70                # 左侧通道名区域宽度，各面板一致以保证时间轴对齐
 START_MAXIMIZED = True         # 启动时直接最大化
 
@@ -44,6 +45,13 @@ INVOLVEMENT_DEFAULT_COLOR = (200, 200, 200)                     # 未知类别�
 UV_PER_SPACING = 20.0          # 初始灵敏度：多少 µV 对应一个通道间距
 GAIN_STEP = 1.25               # 每次按 ↑/↓ 的灵敏度倍率
 REMOVE_WINDOW_MEAN = True      # 显示时减去窗口内均值，避免基线漂移把曲线推出画面
+
+# ---- ICA ----
+def ica_path(session):
+    return DATA_ROOT / "ecog" / f"ecog_{session}_cropped_filtered_rereferred_annotated_+ic.bdf"
+
+ICA_PREFIX = "ICA"             # 只取名字以此开头的通道（不区分大小写）
+ICA_UV_PER_SPACING = 20.0      # ICA 面板初始灵敏度，按实际幅值调
 
 # ---- 眨眼标记 ----
 def blink_path(session):

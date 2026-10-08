@@ -68,10 +68,11 @@ def _decimate_chunked(raw, picks, factor, progress):
     return out
 
 
-def load_eeg(path, target_fs=config.TARGET_FS, progress=None, use_cache=True):
+def load_eeg(path, target_fs=config.TARGET_FS, progress=None, use_cache=True, ch_prefix=None):
     path = Path(path)
     st = path.stat()
-    cache_file = config.CACHE_DIR / f"{path.stem}_{st.st_size}_{int(st.st_mtime)}_{int(target_fs)}.npz"
+    tag = f"_{ch_prefix}" if ch_prefix else ""
+    cache_file = config.CACHE_DIR / f"{path.stem}{tag}_{st.st_size}_{int(st.st_mtime)}_{int(target_fs)}.npz"
 
     if progress:
         progress(0.02, "打开文件…")
@@ -87,7 +88,12 @@ def load_eeg(path, target_fs=config.TARGET_FS, progress=None, use_cache=True):
         return EEGData(z["data"], [str(s) for s in z["names"]], float(z["fs"]), sample_start, video_start, ann)
 
     types = raw.get_channel_types()
-    picks = [i for i, t in enumerate(types) if t != "stim"]      # 排除 Status/触发通道
+    picks = [i for i, t in enumerate(types) if t != "stim"]
+    if ch_prefix:
+        pre = ch_prefix.upper()
+        picks = [i for i in picks if raw.ch_names[i].strip().upper().startswith(pre)]
+        if not picks:
+            raise ValueError(f"{path.name} 中没有以 {ch_prefix} 开头的通道")
     names = [raw.ch_names[i] for i in picks]
 
     ratio = fs / target_fs

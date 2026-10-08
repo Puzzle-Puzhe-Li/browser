@@ -31,7 +31,7 @@ class JumpSlider(QtWidgets.QSlider):
 
 class MainWindow(QtWidgets.QWidget):
 
-    def __init__(self, eeg, speed, session):
+    def __init__(self, eeg, speed, session, ica=None):
         super().__init__()
         self.setWindowTitle(f"EEG Browser - session {session}")
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
@@ -93,6 +93,24 @@ class MainWindow(QtWidgets.QWidget):
             marks=self.blink_times, mark_color=config.BLINK_COLOR,
             mark_height=config.BLINK_TICK_HEIGHT,
             ylabel="EEG (μV)")
+
+        self.ica_panel = None
+        if ica is not None:
+            if ica.sample_start is not None:
+                ica_off = self.t0 - ica.sample_start
+            else:
+                print("[ICA] 未找到 sample_start 标注，按 t_offset=0 处理")
+                ica_off = 0.0
+            print(f"[ICA] {ica.data.shape[0]} 个成分, {ica.duration:.2f} s, "
+                  f"sample_start = {ica.sample_start}, t_offset = {ica_off:.3f}")
+            self.ica_panel = SignalPanel(
+                ica.data, ica.names, ica.fs, self.clock,
+                colors=None, t_offset=ica_off,
+                unit_per_spacing=config.ICA_UV_PER_SPACING,
+                remove_mean=config.REMOVE_WINDOW_MEAN,
+                zero_baseline=False, show_time_axis=False, axis_zero=self.t0,
+                ylabel="ICA")
+            self.ica_panel.setMinimumSize(100, 50)        
         
         inv_df = load_involvement_table(config.involvement_path(session))
         self.inv_model = InvolvementModel(inv_df, self.t0, parent=self)
@@ -150,6 +168,8 @@ class MainWindow(QtWidgets.QWidget):
         right.setContentsMargins(0, 0, 0, 0)
         right.addWidget(self.speed_panel, config.STRETCH_SPEED)
         right.addWidget(self.eeg_panel, config.STRETCH_EEG)
+        if self.ica_panel is not None:
+            right.addWidget(self.ica_panel, config.STRETCH_ICA)
         right.addWidget(self.inv_panel, config.STRETCH_INV)
         right.addWidget(self.tfr_panel, config.STRETCH_TFR)
 
@@ -162,8 +182,11 @@ class MainWindow(QtWidgets.QWidget):
 
         # 框选
         self.overlay = SelectionOverlay(self.right_w, self.eeg_panel, self.t0)
+        sel_panels = [self.speed_panel, self.eeg_panel, self.inv_panel, self.tfr_panel]
+        if self.ica_panel is not None:
+            sel_panels.append(self.ica_panel)
         self.selector = SelectionController(
-            (self.speed_panel, self.eeg_panel, self.inv_panel, self.tfr_panel),
+            tuple(sel_panels),
             self.eeg_panel, self.overlay, self.clock, self.t0, eeg.duration, parent=self)
         self.selector.selectionMade.connect(self._on_selection)
         self.clock.timeChanged.connect(lambda _: self.overlay.set_selection(None))
@@ -181,6 +204,8 @@ class MainWindow(QtWidgets.QWidget):
         self.speed_box.currentIndexChanged.connect(
             lambda: self.clock.set_speed(self.speed_box.currentData()))
         self.mean_chk.toggled.connect(self.eeg_panel.set_remove_mean)
+        if self.ica_panel is not None:
+            self.mean_chk.toggled.connect(self.ica_panel.set_remove_mean)
         self.clock.timeChanged.connect(self._on_time)
         self.clock.playingChanged.connect(
             lambda p: self.btn.setText("⏸ 暂停" if p else "▶ 播放"))
@@ -345,6 +370,8 @@ class MainWindow(QtWidgets.QWidget):
             more = (k == K.Key_Plus)                        # + 放大波形，- 缩小
             self.speed_panel.change_gain(more)
             self.eeg_panel.change_gain(more)
+            if self.ica_panel is not None:
+                self.ica_panel.change_gain(more)
         elif k == K.Key_Asterisk:
             self._change_play_speed(+1)
         elif k == K.Key_Slash:
@@ -367,7 +394,7 @@ class MainWindow(QtWidgets.QWidget):
             self.video_panel.release()
         super().closeEvent(e)
 
-def load_with_dialog(path):
+def load_with_dialog(path, **kw):
     dlg = QtWidgets.QProgressDialog("正在加载…", "取消", 0, 100)
     dlg.setCancelButton(None)
     dlg.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
@@ -379,7 +406,7 @@ def load_with_dialog(path):
         dlg.setValue(int(frac * 100))
         QtWidgets.QApplication.processEvents()
 
-    eeg = load_eeg(path, progress=cb)
+    eeg = load_eeg(path, progress=cb, **kw)
     dlg.close()
     return eeg
 
@@ -404,6 +431,12 @@ def main():
 
     eeg = load_with_dialog(eeg_path)
     speed = load_speed_csv(speed_path)
+    ica = None
+    ica_p = config.ica_path(session)
+    if ica_p.exists():
+        ica = load_with_dialog(ica_p, ch_prefix=config.ICA_PREFIX)
+    else:
+        print(f"[ICA] 未找到 {ica_p}")    
 
     # 诊断信息（控制台）
     print(f"[EEG] {eeg.data.shape[0]} 通道, {eeg.duration:.2f} s, sample_start = {eeg.sample_start}")
@@ -411,7 +444,7 @@ def main():
     print(f"[速度] {speed.data.shape[0]} 关节, {speed.fs:g} Hz, {speed.duration:.2f} s, "
           f"起点 {speed.t_start:g} s")
 
-    win = MainWindow(eeg, speed, session)
+    win = MainWindow(eeg, speed, session, ica=ica)
     win.place_normal()                       # 先设好"还原后"的大小与位置
     if config.START_MAXIMIZED:
         win.showMaximized()
