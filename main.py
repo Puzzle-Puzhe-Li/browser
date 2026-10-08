@@ -16,6 +16,7 @@ from motion_loader import (load_speed_csv, load_blink_times,
                            load_video_intercept, load_involvement_table)
 from involvement_model import InvolvementModel
 from selection import SelectionHost, SelectionOverlay, SelectionController
+from ica_colors import compute_ica_colors
 
 
 class JumpSlider(QtWidgets.QSlider):
@@ -103,14 +104,29 @@ class MainWindow(QtWidgets.QWidget):
                 ica_off = 0.0
             print(f"[ICA] {ica.data.shape[0]} 个成分, {ica.duration:.2f} s, "
                   f"sample_start = {ica.sample_start}, t_offset = {ica_off:.3f}")
+
+            # ---- 按通道权重给成分上色 ----
+            ica_colors, ica_labels = {}, {}
+            fp = config.ica_fif_path(session)
+            if fp.exists():
+                try:
+                    ica_colors, ica_labels = compute_ica_colors(
+                        fp, ica.names, load_colors(config.CHANNEL_CMAP_PATH))
+                except Exception as ex:
+                    print(f"[ICA] 权重读取失败，不上色: {ex}")
+            else:
+                print(f"[ICA] 未找到 {fp}，不上色")
+
+            disp_names = [ica_labels.get(n.strip(), n) for n in ica.names]
             self.ica_panel = SignalPanel(
-                ica.data, ica.names, ica.fs, self.clock,
-                colors=None, t_offset=ica_off,
+                ica.data, disp_names, ica.fs, self.clock,
+                colors={ica_labels[k]: v for k, v in ica_colors.items()},
+                t_offset=ica_off,
                 unit_per_spacing=config.ICA_UV_PER_SPACING,
                 remove_mean=config.REMOVE_WINDOW_MEAN,
                 zero_baseline=False, show_time_axis=False, axis_zero=self.t0,
                 ylabel="ICA")
-            self.ica_panel.setMinimumSize(100, 50)        
+            self.ica_panel.setMinimumSize(100, 50)
         
         inv_df = load_involvement_table(config.involvement_path(session))
         self.inv_model = InvolvementModel(inv_df, self.t0, parent=self)

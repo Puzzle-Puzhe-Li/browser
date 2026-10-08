@@ -50,8 +50,11 @@ REMOVE_WINDOW_MEAN = True      # 显示时减去窗口内均值，避免基线�
 def ica_path(session):
     return DATA_ROOT / "ecog" / f"ecog_{session}_cropped_filtered_rereferred_annotated_+ic.bdf"
 
+def ica_fif_path(session):
+    return DATA_ROOT / "ecog" / f"ica_{session}.fif"
+
 ICA_PREFIX = "ICA"             # 只取名字以此开头的通道（不区分大小写）
-ICA_UV_PER_SPACING = 20.0      # ICA 面板初始灵敏度，按实际幅值调
+ICA_UV_PER_SPACING = 80.0      # ICA 面板初始灵敏度，按实际幅值调
 
 # ---- 眨眼标记 ----
 def blink_path(session):
