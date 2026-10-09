@@ -17,6 +17,7 @@ from motion_loader import (load_speed_csv, load_blink_times,
 from involvement_model import InvolvementModel
 from selection import SelectionHost, SelectionOverlay, SelectionController
 from ica_colors import compute_ica_colors
+from overview_bar import OverviewBar
 
 
 class JumpSlider(QtWidgets.QSlider):
@@ -172,9 +173,18 @@ class MainWindow(QtWidgets.QWidget):
             "小键盘 +/- 纵轴比例尺   * / 播放速度加/减   Home/End 首/尾   双击脑电通道名 切换TFR通道   "
             "暂停时拖动框选时间段→选择动作类型   Ctrl+Z 撤销   右键运动类型栏 导出/导入")
 
+        self.overview = OverviewBar(self.inv_model, self.clock, height=4)
+        slider_col = QtWidgets.QVBoxLayout()
+        slider_col.setSpacing(1)
+        slider_col.setContentsMargins(0, 0, 0, 0)
+        slider_col.addWidget(self.overview)
+        slider_col.addWidget(self.slider)
+
         row = QtWidgets.QHBoxLayout()
-        for w in (self.btn, self.slider, self.time_label, self.speed_box, self.mean_chk):
-            row.addWidget(w, 1 if w is self.slider else 0)
+        row.addWidget(self.btn)
+        row.addLayout(slider_col, 1)
+        for w in (self.time_label, self.speed_box, self.mean_chk):
+            row.addWidget(w)
         row2 = QtWidgets.QHBoxLayout()
         row2.addWidget(self.hint, 1)
         row2.addWidget(self.info)
