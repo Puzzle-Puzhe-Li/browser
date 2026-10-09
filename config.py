@@ -30,7 +30,7 @@ STRETCH_SPEED = 10
 STRETCH_EEG = 32
 STRETCH_ICA = 11
 STRETCH_INV = 1                
-STRETCH_TFR = 13
+STRETCH_TFR = 15
 AXIS_WIDTH = 70                # 左侧通道名区域宽度，各面板一致以保证时间轴对齐
 START_MAXIMIZED = True         # 启动时直接最大化
 
@@ -54,7 +54,7 @@ def ica_fif_path(session):
     return DATA_ROOT / "ecog" / f"ica_{session}.fif"
 
 ICA_PREFIX = "ICA"             # 只取名字以此开头的通道（不区分大小写）
-ICA_UV_PER_SPACING = 80.0      # ICA 面板初始灵敏度，按实际幅值调
+ICA_UV_PER_SPACING = 60.0      # ICA 面板初始灵敏度，按实际幅值调
 
 # ---- 眨眼标记 ----
 def blink_path(session):
@@ -79,7 +79,7 @@ VIDEO_MAX_FRAC = 0.45          # 视频列占窗口宽度的最大比例
 WINDOW_SCREEN_FRAC = (0.95, 0.92)   # 窗口占屏幕可用区域的 (宽, 高) 比例
 
 # ---- 速度显示 ----
-SPEED_YPAD_TOP = 3.0
+SPEED_YPAD_TOP = 2.0
 SPEED_PER_SPACING = 20     # 初始灵敏度：取全部速度值的该百分位作为一个通道间距
 
 # ---- TFR ----
