@@ -18,6 +18,32 @@ FREQ_TICKS = (1, 4, 8, 13, 30, 80, 150)
 N_LOG_ROWS = 200
 FREQ_OFFSET = 10.0
 
+class TimeAxis(pg.AxisItem):
+    """offset 为 None 时按样本相对时间显示；否则按 mm:ss 显示视频时间。双击轴标签触发回调。"""
+    offset = None
+    on_double_click = None
+
+    def tickStrings(self, values, scale, spacing):
+        if self.offset is None:
+            return super().tickStrings(values, scale, spacing)
+        out = []
+        for v in values:
+            sec = int(round(v + self.offset))
+            m, s = divmod(abs(sec), 60)
+            out.append(f"{'-' if sec < 0 else ''}{m:02d}:{s:02d}")
+        return out
+
+    def mouseClickEvent(self, ev):
+        if (ev.button() == QtCore.Qt.MouseButton.LeftButton and ev.double()
+                and self.on_double_click is not None
+                and self.label.sceneBoundingRect().contains(ev.scenePos())):
+            self.on_double_click()
+            ev.accept()
+            return
+        super().mouseClickEvent(ev)
+
+
+
 
 class SmoothImageItem(pg.ImageItem):
     """绘制时启用平滑插值（类似 gouraud shading）。"""
@@ -64,13 +90,15 @@ def compute_tfr_db(x_uv, fs, freqs, n_cycles, out_fs, progress=None):
 
 class TFRPanel(QtWidgets.QWidget):
     def __init__(self, data, names, fs, clock, axis_zero=0.0, cache_tag="",
-                 channel=None, parent=None):
+                 channel=None, video_t0=None, parent=None):
         super().__init__(parent)
         self.data = data
         self.names = [n.strip() for n in names]
         self.fs = float(fs)
         self.clock = clock
         self.axis_zero = float(axis_zero)
+        self.video_t0 = video_t0
+        self.video_mode = False        
         self.cache_tag = cache_tag
         self.half = config.WINDOW_SEC / 2.0
         self.freqs = np.asarray(config.TFR_FREQS, dtype=float)
@@ -90,7 +118,6 @@ class TFRPanel(QtWidgets.QWidget):
         self._tfr = None
         self.channel = None
 
-        self.plot = pg.PlotWidget()
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
@@ -100,7 +127,9 @@ class TFRPanel(QtWidgets.QWidget):
         self.title.setContentsMargins(config.AXIS_WIDTH, 0, 0, 0)
         lay.addWidget(self.title)
 
-        self.plot = pg.PlotWidget()
+        self.time_axis = TimeAxis("bottom")
+        self.time_axis.on_double_click = self.toggle_time_mode
+        self.plot = pg.PlotWidget(axisItems={"bottom": self.time_axis})
         lay.addWidget(self.plot, 1)
 
         pi = self.plot.getPlotItem()
@@ -114,7 +143,7 @@ class TFRPanel(QtWidgets.QWidget):
         left = pi.getAxis("left")
         left.setWidth(config.AXIS_WIDTH)
         left.setTicks([[(float(np.log10(v + FREQ_OFFSET)), f"{v:g}") for v in FREQ_TICKS]])
-        pi.setLabel("bottom", "时间 (s)")
+        pi.setLabel("bottom", "样本相对时间 (s)")
         pi.setLabel("left", "Frequency (Hz)")
         # y 轴坐标 = log10(频率)；范围覆盖所有刻度
         y_lo = min(self.log_lo, np.log10(min(FREQ_TICKS) + FREQ_OFFSET))
@@ -149,6 +178,16 @@ class TFRPanel(QtWidgets.QWidget):
                 w = (f - freqs[k - 1]) / (freqs[k] - freqs[k - 1])
                 W[j, k - 1], W[j, k] = 1.0 - w, w
         return W
+
+    def toggle_time_mode(self):
+        if self.video_t0 is None:
+            return
+        self.video_mode = not self.video_mode
+        self.time_axis.offset = (self.axis_zero - self.video_t0) if self.video_mode else None
+        self.plot.getPlotItem().setLabel(
+            "bottom", "视频时间 (mm:ss)" if self.video_mode else "样本相对时间 (s)")
+        self.time_axis.picture = None
+        self.time_axis.update()    
 
     # ---- 对外接口 ----
     def set_channel(self, name):

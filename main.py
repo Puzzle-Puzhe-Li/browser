@@ -137,7 +137,8 @@ class MainWindow(QtWidgets.QWidget):
         self.tfr_panel = TFRPanel(
             eeg.data, eeg.names, eeg.fs, self.clock,
             axis_zero=self.t0, cache_tag=session,
-            channel=config.DEFAULT_TFR_CHANNEL)        
+            channel=config.DEFAULT_TFR_CHANNEL,
+            video_t0=self.v0 if self.video_panel is not None else None)   
         
         for p in (self.speed_panel, self.eeg_panel, self.tfr_panel):
             p.setMinimumSize(100, 50)
@@ -170,7 +171,7 @@ class MainWindow(QtWidgets.QWidget):
         self.info = QtWidgets.QLabel()
         self.hint = QtWidgets.QLabel(
             "空格 播放/暂停   ←/→ ±1 s   PgUp/PgDn ±10 s   Shift+←/→ 上/下一段起点   Ctrl+←/→ ±1 帧   "
-            "小键盘 +/- 纵轴比例尺   * / 播放速度加/减   Home/End 首/尾   双击脑电通道名 切换TFR通道   "
+            "小键盘 +/- 纵轴比例尺   * / 播放速度加/减   Home/End 首/尾   双击脑电通道名 切换TFR通道   双击时间轴标签 切换时间轴(样本相对/视频)   "
             "暂停时拖动框选时间段→选择动作类型   Ctrl+Z 撤销   右键运动类型栏 导出/导入")
 
         self.overview = OverviewBar(self.inv_model, self.clock, height=4)
