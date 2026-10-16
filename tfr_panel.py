@@ -130,6 +130,7 @@ class TFRPanel(QtWidgets.QWidget):
         self.time_axis = TimeAxis("bottom")
         self.time_axis.on_double_click = self.toggle_time_mode
         self.plot = pg.PlotWidget(axisItems={"bottom": self.time_axis})
+        self.plot.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)        
         lay.addWidget(self.plot, 1)
 
         pi = self.plot.getPlotItem()

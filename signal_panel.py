@@ -72,6 +72,7 @@ class SignalPanel(QtWidgets.QWidget):
         left_axis = ClickableAxis("left", names=names,
                                   on_double_click=self.channelDoubleClicked.emit)
         self.plot = pg.PlotWidget(axisItems={"left": left_axis})
+        self.plot.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)        
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self.plot)

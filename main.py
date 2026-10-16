@@ -9,7 +9,7 @@ from clock import Clock
 from eeg_loader import load_eeg
 from signal_panel import SignalPanel, load_colors
 from video_panel import VideoPanel
-from tfr_panel import TFRPanel 
+from tfr_panel import TFRPanel
 from involvement_panel import InvolvementPanel
 
 from motion_loader import (load_speed_csv, load_blink_times,
@@ -18,6 +18,7 @@ from involvement_model import InvolvementModel
 from selection import SelectionHost, SelectionOverlay, SelectionController
 from ica_colors import compute_ica_colors
 from overview_bar import OverviewBar
+
 
 class HelpDialog(QtWidgets.QDialog):
     ROWS = [
@@ -48,7 +49,8 @@ class HelpDialog(QtWidgets.QDialog):
             if v is None:
                 html.append(f"<tr><td colspan='2'><b>{k}</b></td></tr>")
             else:
-                html.append(f"<tr><td><code>{k}</code>&nbsp;&nbsp;&nbsp;</td><td>{v}</td></tr>")
+                html.append(
+                    f"<tr><td><code>{k}</code>&nbsp;&nbsp;&nbsp;</td><td>{v}</td></tr>")
         html.append("</table>")
         lab = QtWidgets.QLabel("".join(html))
         lay = QtWidgets.QVBoxLayout(self)
@@ -59,6 +61,7 @@ class HelpDialog(QtWidgets.QDialog):
             self.accept()
         else:
             super().keyPressEvent(e)
+
 
 class GotoDialog(QtWidgets.QDialog):
     def __init__(self, t_sample, t_video, parent=None):
@@ -71,8 +74,10 @@ class GotoDialog(QtWidgets.QDialog):
         form = QtWidgets.QFormLayout(self)
         form.addRow("样本时间 (s)", self.sample_edit)
         form.addRow("视频时间 (mm:ss)", self.video_edit)
-        self.sample_edit.returnPressed.connect(lambda: self._submit("sample", self.sample_edit))
-        self.video_edit.returnPressed.connect(lambda: self._submit("video", self.video_edit))
+        self.sample_edit.returnPressed.connect(
+            lambda: self._submit("sample", self.sample_edit))
+        self.video_edit.returnPressed.connect(
+            lambda: self._submit("video", self.video_edit))
         self.sample_edit.selectAll()
 
     @staticmethod
@@ -92,11 +97,13 @@ class GotoDialog(QtWidgets.QDialog):
 
     def _submit(self, kind, edit):
         try:
-            v = self._parse_mmss(edit.text()) if kind == "video" else float(edit.text().strip())
+            v = self._parse_mmss(edit.text()) if kind == "video" else float(
+                edit.text().strip())
         except ValueError:
             return
         self.kind, self.value = kind, v
         self.accept()
+
 
 class JumpSlider(QtWidgets.QSlider):
     """点击滑条任意位置直接跳转。"""
@@ -115,6 +122,8 @@ class MainWindow(QtWidgets.QWidget):
         super().__init__()
         self.setWindowTitle(f"EEG Browser - session {session}")
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
+        QtWidgets.QApplication.instance().focusChanged.connect(lambda *_: self.setFocus() if not self.isActiveWindow()
+                                                               or not isinstance(QtWidgets.QApplication.focusWidget(), QtWidgets.QLineEdit) else None)
 
         # 运动数据的 0 时刻在 EEG 时间轴上的位置
         if eeg.sample_start is not None:
@@ -127,9 +136,11 @@ class MainWindow(QtWidgets.QWidget):
                                 if config.USE_VIDEO_SYNC else 0.0)
         print(f"[同步] 视频截距 {self.video_intercept:.4f} s")
         if eeg.video_start is not None:
-            self.v0, self.v0_src = eeg.video_start + config.VIDEO_OFFSET + self.video_intercept, "BDF 标注"
+            self.v0, self.v0_src = eeg.video_start + \
+                config.VIDEO_OFFSET + self.video_intercept, "BDF 标注"
         else:
-            self.v0, self.v0_src = self.t0 + config.VIDEO_OFFSET + self.video_intercept, "sample_start 回退"  
+            self.v0, self.v0_src = self.t0 + config.VIDEO_OFFSET + \
+                self.video_intercept, "sample_start 回退"
 
         # 眨眼时刻：eog_time 相对 video_start，换算为 EEG 时间
         vbase = eeg.video_start if eeg.video_start is not None else self.t0
@@ -150,9 +161,9 @@ class MainWindow(QtWidgets.QWidget):
                 print(f"[视频] {ex}")
         else:
             print(f"[视频] 未找到 {vpath}")
-            
+
         # 单帧步长使用的帧率：优先用视频真实帧率，没有视频则用 config.FPS
-        self.frame_fps = self.video_panel.fps if self.video_panel is not None else config.FPS            
+        self.frame_fps = self.video_panel.fps if self.video_panel is not None else config.FPS
         W, H, video_w = self._plan_geometry()
         self.resize(W, H)
 
@@ -206,18 +217,18 @@ class MainWindow(QtWidgets.QWidget):
                 zero_baseline=False, show_time_axis=False, axis_zero=self.t0,
                 ylabel="ICA")
             self.ica_panel.setMinimumSize(100, 50)
-        
+
         inv_df = load_involvement_table(config.involvement_path(session))
         self.inv_model = InvolvementModel(inv_df, self.t0, parent=self)
         print(f"[动作类型] {len(self.inv_model.segs)} 段")
         self.inv_panel = InvolvementPanel(self.inv_model, self.clock,
-                                        axis_zero=self.t0, session=session)      
+                                          axis_zero=self.t0, session=session)
         self.tfr_panel = TFRPanel(
             eeg.data, eeg.names, eeg.fs, self.clock,
             axis_zero=self.t0, cache_tag=session,
             channel=config.DEFAULT_TFR_CHANNEL,
-            video_t0=self.v0 if self.video_panel is not None else None)   
-        
+            video_t0=self.v0 if self.video_panel is not None else None)
+
         for p in (self.speed_panel, self.eeg_panel, self.tfr_panel):
             p.setMinimumSize(100, 50)
         self.inv_panel.setMinimumSize(100, 28)      # 新增
@@ -244,7 +255,7 @@ class MainWindow(QtWidgets.QWidget):
 
         self.mean_chk = QtWidgets.QCheckBox("脑电去窗口均值")
         self.mean_chk.setChecked(config.REMOVE_WINDOW_MEAN)
-        self.mean_chk.setFocusPolicy(NF)  
+        self.mean_chk.setFocusPolicy(NF)
 
         self.info = QtWidgets.QLabel()
         self.hint = QtWidgets.QLabel("H 快捷键与操作说明")
@@ -284,15 +295,18 @@ class MainWindow(QtWidgets.QWidget):
 
         # 框选
         self.overlay = SelectionOverlay(self.right_w, self.eeg_panel, self.t0)
-        sel_panels = [self.speed_panel, self.eeg_panel, self.inv_panel, self.tfr_panel]
+        sel_panels = [self.speed_panel, self.eeg_panel,
+                      self.inv_panel, self.tfr_panel]
         if self.ica_panel is not None:
             sel_panels.append(self.ica_panel)
         self.selector = SelectionController(
             tuple(sel_panels),
             self.eeg_panel, self.overlay, self.clock, self.t0, eeg.duration, parent=self)
         self.selector.selectionMade.connect(self._on_selection)
-        self.clock.timeChanged.connect(lambda _: self.overlay.set_selection(None))
-        self.clock.playingChanged.connect(lambda _: self.overlay.set_selection(None))
+        self.clock.timeChanged.connect(
+            lambda _: self.overlay.set_selection(None))
+        self.clock.playingChanged.connect(
+            lambda _: self.overlay.set_selection(None))
         self.inv_model.dirtyChanged.connect(self._update_title)
         self._session = session
 
@@ -329,7 +343,8 @@ class MainWindow(QtWidgets.QWidget):
 
     def _update_title(self, dirty=None):
         d = self.inv_model.dirty if dirty is None else dirty
-        self.setWindowTitle(f"EEG Browser - session {self._session}" + (" *" if d else ""))
+        self.setWindowTitle(
+            f"EEG Browser - session {self._session}" + (" *" if d else ""))
 
     def _on_selection(self, a, b, gp):
         # 延后到事件循环里弹菜单，避免在 eventFilter 内阻塞
@@ -337,14 +352,16 @@ class MainWindow(QtWidgets.QWidget):
 
     def _show_assign_menu(self, a, b, gp):
         m = QtWidgets.QMenu(self)
-        title = m.addAction(f"{a - self.t0:.2f} – {b - self.t0:.2f} s（{b - a:.2f} s）设为：")
+        title = m.addAction(
+            f"{a - self.t0:.2f} – {b - self.t0:.2f} s（{b - a:.2f} s）设为：")
         title.setEnabled(False)
         m.addSeparator()
         for name in config.INVOLVEMENT_ORDER:
             pm = QtGui.QPixmap(12, 12)
             pm.fill(QtGui.QColor(*self.inv_panel.color_of(name)))
             act = m.addAction(QtGui.QIcon(pm), name)
-            act.triggered.connect(lambda _=False, n=name: self.inv_model.assign(a, b, n))
+            act.triggered.connect(
+                lambda _=False, n=name: self.inv_model.assign(a, b, n))
         m.addSeparator()
         m.addAction("取消")
         m.exec(gp)
@@ -368,7 +385,7 @@ class MainWindow(QtWidgets.QWidget):
                     old & QtCore.Qt.WindowState.WindowMinimized) \
                     and self.windowState() == QtCore.Qt.WindowState.WindowNoState:
                 QtCore.QTimer.singleShot(0, self.fit_to_screen)
-        super().changeEvent(e)        
+        super().changeEvent(e)
 
     def fit_to_screen(self):
         if self.isMaximized() or self.isFullScreen():
@@ -491,10 +508,12 @@ class MainWindow(QtWidgets.QWidget):
         elif k == K.Key_End:
             self.clock.seek(self.clock.duration)
         elif k == K.Key_G:
-            self._goto()            
+            self._goto()
         elif k == K.Key_H:
             HelpDialog(self).exec()
-            self.setFocus()            
+            self.setFocus()
+        elif k in (K.Key_Plus, K.Key_Equal, K.Key_Minus):
+            more = (k in (K.Key_Plus, K.Key_Equal))
         else:
             super().keyPressEvent(e)
 
@@ -508,6 +527,7 @@ class MainWindow(QtWidgets.QWidget):
         if self.video_panel is not None:
             self.video_panel.release()
         super().closeEvent(e)
+
 
 def load_with_dialog(path, **kw):
     dlg = QtWidgets.QProgressDialog("正在加载…", "取消", 0, 100)
@@ -551,10 +571,11 @@ def main():
     if ica_p.exists():
         ica = load_with_dialog(ica_p, ch_prefix=config.ICA_PREFIX)
     else:
-        print(f"[ICA] 未找到 {ica_p}")    
+        print(f"[ICA] 未找到 {ica_p}")
 
     # 诊断信息（控制台）
-    print(f"[EEG] {eeg.data.shape[0]} 通道, {eeg.duration:.2f} s, sample_start = {eeg.sample_start}")
+    print(
+        f"[EEG] {eeg.data.shape[0]} 通道, {eeg.duration:.2f} s, sample_start = {eeg.sample_start}")
     print(f"[EEG] 标注(前10条): {(eeg.annotations or [])[:10]}")
     print(f"[速度] {speed.data.shape[0]} 关节, {speed.fs:g} Hz, {speed.duration:.2f} s, "
           f"起点 {speed.t_start:g} s")

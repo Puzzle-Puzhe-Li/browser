@@ -36,6 +36,7 @@ class InvolvementPanel(QtWidgets.QWidget):
         lay.addWidget(self.legend)
 
         self.plot = pg.PlotWidget()
+        self.plot.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)        
         lay.addWidget(self.plot, 1)
 
         pi = self.plot.getPlotItem()
