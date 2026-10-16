@@ -19,6 +19,47 @@ from selection import SelectionHost, SelectionOverlay, SelectionController
 from ica_colors import compute_ica_colors
 from overview_bar import OverviewBar
 
+class HelpDialog(QtWidgets.QDialog):
+    ROWS = [
+        ("键盘", None),
+        ("空格", "播放 / 暂停"),
+        ("← / →", "后退 / 前进 1 s"),
+        ("PgUp / PgDn", "后退 / 前进 10 s"),
+        ("Shift + ← / →", "上一段 / 下一段起点"),
+        ("Ctrl + ← / →", "后退 / 前进 1 帧"),
+        ("G", "时间定位（样本时间 / 视频时间，回车定位）"),
+        ("小键盘 + / -", "放大 / 缩小纵轴比例尺"),
+        ("* / /", "播放速度加 / 减"),
+        ("Home / End", "跳到开头 / 结尾"),
+        ("Ctrl + Z", "撤销动作类型修改"),
+        ("H", "打开 / 关闭本帮助"),
+        ("鼠标", None),
+        ("双击脑电通道名", "切换 TFR 通道"),
+        ("暂停时拖动框选", "选择时间段并设置动作类型"),
+        ("右键动作类型栏", "撤销 / 导入 / 导出"),
+        ("点击进度条或色条", "跳转到对应时间"),
+    ]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("快捷键与操作说明")
+        html = ["<table cellspacing='4'>"]
+        for k, v in self.ROWS:
+            if v is None:
+                html.append(f"<tr><td colspan='2'><b>{k}</b></td></tr>")
+            else:
+                html.append(f"<tr><td><code>{k}</code>&nbsp;&nbsp;&nbsp;</td><td>{v}</td></tr>")
+        html.append("</table>")
+        lab = QtWidgets.QLabel("".join(html))
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.addWidget(lab)
+
+    def keyPressEvent(self, e):
+        if e.key() == QtCore.Qt.Key.Key_H:
+            self.accept()
+        else:
+            super().keyPressEvent(e)
+
 class GotoDialog(QtWidgets.QDialog):
     def __init__(self, t_sample, t_video, parent=None):
         super().__init__(parent)
@@ -206,11 +247,7 @@ class MainWindow(QtWidgets.QWidget):
         self.mean_chk.setFocusPolicy(NF)  
 
         self.info = QtWidgets.QLabel()
-        self.hint = QtWidgets.QLabel(
-            "空格 播放/暂停   ←/→ ±1 s   PgUp/PgDn ±10 s   Shift+←/→ 上/下一段起点   Ctrl+←/→ ±1 帧   "
-            "小键盘 +/- 纵轴比例尺   * / 播放速度加/减   Home/End 首/尾   双击脑电通道名 切换TFR通道   双击时间轴标签 切换时间轴(样本相对/视频)   "
-            "暂停时拖动框选时间段→选择动作类型   Ctrl+Z 撤销   右键运动类型栏 导出/导入"
-            "G 时间定位   ")
+        self.hint = QtWidgets.QLabel("H 快捷键与操作说明")
 
         self.overview = OverviewBar(self.inv_model, self.clock, height=4)
         slider_col = QtWidgets.QVBoxLayout()
@@ -455,6 +492,9 @@ class MainWindow(QtWidgets.QWidget):
             self.clock.seek(self.clock.duration)
         elif k == K.Key_G:
             self._goto()            
+        elif k == K.Key_H:
+            HelpDialog(self).exec()
+            self.setFocus()            
         else:
             super().keyPressEvent(e)
 
