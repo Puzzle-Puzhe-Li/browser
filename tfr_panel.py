@@ -90,10 +90,15 @@ def compute_tfr_db(x_uv, fs, freqs, n_cycles, out_fs, progress=None):
 
 class TFRPanel(QtWidgets.QWidget):
     def __init__(self, data, names, fs, clock, axis_zero=0.0, cache_tag="",
-                 channel=None, video_t0=None, parent=None):
+                 channel=None, video_t0=None, extra=None, parent=None):
         super().__init__(parent)
         self.data = data
+        self._n_t = -(-data.shape[1] // max(1, int(round(fs / config.TFR_FS))))        
         self.names = [n.strip() for n in names]
+        self.sources = {n.strip(): (data, i, cache_tag, 0.0) for i, n in enumerate(names)}
+        for tag, (d, nm, off) in (extra or {}).items():
+            for i, n in enumerate(nm):
+                self.sources[n.strip()] = (d, i, tag, off)        
         self.fs = float(fs)
         self.clock = clock
         self.axis_zero = float(axis_zero)
@@ -193,7 +198,7 @@ class TFRPanel(QtWidgets.QWidget):
     # ---- 对外接口 ----
     def set_channel(self, name):
         name = name.strip()
-        if name not in self.names:
+        if name not in self.sources:
             return
         self.channel = name
         self.title.setText(f"TFR channel: <b>{name}</b>")
@@ -202,10 +207,11 @@ class TFRPanel(QtWidgets.QWidget):
 
     # ---- 计算 / 缓存 ----
     def _cache_file(self, name):
+        d, ch, tag, off = self.sources[name]
         key = f"{self.freqs[0]}_{self.freqs[-1]}_{len(self.freqs)}_{self.out_fs}_" \
-              f"{self.n_cycles.sum():.3f}_{self.data.shape[1]}_{self.fs}"
+              f"{self.n_cycles.sum():.3f}_{d.shape[1]}_{self.fs}"
         h = hashlib.md5(key.encode()).hexdigest()[:8]
-        return config.CACHE_DIR / f"tfr_{self.cache_tag}_{name}_{h}.npy"
+        return config.CACHE_DIR / f"tfr_{tag}_{name}_{h}.npy"
 
     def _get_tfr(self, name):
         if name in self._cache:
@@ -218,9 +224,19 @@ class TFRPanel(QtWidgets.QWidget):
             try:
                 self.title.setText(f"TFR channel: <b>{name}</b> (计算中…)")
                 QtWidgets.QApplication.processEvents()
-                ch = self.names.index(name)
-                tfr = compute_tfr_db(self.data[ch], self.fs, self.freqs,
+                d, ch, tag, off = self.sources[name]
+                tfr = compute_tfr_db(d[ch], self.fs, self.freqs,
                                      self.n_cycles, self.out_fs)
+                if off:
+                    shift = int(round(off * self.out_fs))
+                    full = np.full((tfr.shape[0], self._n_t), tfr.min(), dtype=np.float32)
+                    if shift >= 0:
+                        n = min(tfr.shape[1], self._n_t - shift)
+                        full[:, shift:shift + n] = tfr[:, :n]
+                    else:
+                        n = min(tfr.shape[1] + shift, self._n_t)
+                        full[:, :n] = tfr[:, -shift:-shift + n]
+                    tfr = full
                 config.CACHE_DIR.mkdir(parents=True, exist_ok=True)
                 np.save(f, tfr)
             finally:

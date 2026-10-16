@@ -208,6 +208,7 @@ class MainWindow(QtWidgets.QWidget):
                 print(f"[ICA] 未找到 {fp}，不上色")
 
             disp_names = [ica_labels.get(n.strip(), n) for n in ica.names]
+            self._ica_name_map = {d: n.strip() for d, n in zip(disp_names, ica.names)}            
             self.ica_panel = SignalPanel(
                 ica.data, disp_names, ica.fs, self.clock,
                 colors={ica_labels[k]: v for k, v in ica_colors.items()},
@@ -223,11 +224,15 @@ class MainWindow(QtWidgets.QWidget):
         print(f"[动作类型] {len(self.inv_model.segs)} 段")
         self.inv_panel = InvolvementPanel(self.inv_model, self.clock,
                                           axis_zero=self.t0, session=session)
+        extra = None
+        if ica is not None:
+            extra = {f"{session}_ica": (ica.data, [n.strip() for n in ica.names], ica_off)}
         self.tfr_panel = TFRPanel(
             eeg.data, eeg.names, eeg.fs, self.clock,
             axis_zero=self.t0, cache_tag=session,
             channel=config.DEFAULT_TFR_CHANNEL,
-            video_t0=self.v0 if self.video_panel is not None else None)
+            video_t0=self.v0 if self.video_panel is not None else None,
+            extra=extra)
 
         for p in (self.speed_panel, self.eeg_panel, self.tfr_panel):
             p.setMinimumSize(100, 50)
@@ -328,10 +333,15 @@ class MainWindow(QtWidgets.QWidget):
         self.eeg_panel.gainChanged.connect(self._refresh_info)
         self.speed_panel.gainChanged.connect(self._refresh_info)
         self.eeg_panel.channelDoubleClicked.connect(self.tfr_panel.set_channel)
+        if self.ica_panel is not None:
+            self.ica_panel.channelDoubleClicked.connect(self._ica_tfr)        
 
         self._on_time(0.0)
         self._refresh_info()
         self.setMinimumSize(640, 480)
+
+    def _ica_tfr(self, disp_name):
+        self.tfr_panel.set_channel(self._ica_name_map.get(disp_name, disp_name))        
 
     def _goto(self):
         t = self.clock.time
