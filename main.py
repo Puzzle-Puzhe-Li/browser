@@ -547,7 +547,7 @@ def load_with_dialog(path, **kw):
 
 
 def main():
-    pg.setConfigOptions(antialias=False, background="w", foreground="k",
+    pg.setConfigOptions(antialias=True, background="w", foreground="k",
                         useOpenGL=config.USE_OPENGL)
     app = pg.mkQApp("EEG Browser")
 
