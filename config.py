@@ -28,9 +28,9 @@ SPEEDS = [0.25, 0.5, 1, 2, 4, 8, 16, 32]
 # ---- 布局 ----(把这几行替换)
 STRETCH_SPEED = 10
 STRETCH_EEG = 32
-STRETCH_ICA = 11
+STRETCH_ICA = 16
 STRETCH_INV = 1                
-STRETCH_TFR = 15
+STRETCH_TFR = 10
 AXIS_WIDTH = 70                # 左侧通道名区域宽度，各面板一致以保证时间轴对齐
 START_MAXIMIZED = True         # 启动时直接最大化
 
