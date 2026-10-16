@@ -120,3 +120,18 @@ def load_eeg(path, target_fs=config.TARGET_FS, progress=None, use_cache=True, ch
     if progress:
         progress(1.0, "完成")
     return eeg
+
+def apply_channel_order(eeg, path):
+    try:
+        with open(path, "r", encoding="utf-8-sig") as f:
+            nums = [s.strip() for s in f if s.strip()]
+    except OSError:
+        return eeg
+    want = [f"L{n}" for n in reversed(nums)] + [f"R{n}" for n in nums]
+    pos = {n.strip().upper(): i for i, n in enumerate(eeg.names)}
+    idx = [pos[w] for w in want if w in pos]
+    used = set(idx)
+    idx += [i for i in range(len(eeg.names)) if i not in used]
+    eeg.data = eeg.data[idx]
+    eeg.names = [eeg.names[i] for i in idx]
+    return eeg

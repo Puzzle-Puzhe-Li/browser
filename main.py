@@ -6,7 +6,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import config
 from clock import Clock
-from eeg_loader import load_eeg
+from eeg_loader import load_eeg, apply_channel_order
 from signal_panel import SignalPanel, load_colors
 from video_panel import VideoPanel
 from tfr_panel import TFRPanel
@@ -591,6 +591,7 @@ def main():
         return
 
     eeg = load_with_dialog(eeg_path)
+    eeg = apply_channel_order(eeg, config.CHANNEL_ORDER_PATH)    
     speed = load_speed_csv(speed_path)
     ica = None
     ica_p = config.ica_path(session)

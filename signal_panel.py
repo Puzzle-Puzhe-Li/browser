@@ -127,7 +127,7 @@ class SignalPanel(QtWidgets.QWidget):
             top = self.n_ch - 1 + (y_top_pad if y_top_pad is not None else 0.6)
             pi.setYRange(-0.6, top, padding=0)
         else:
-            pi.setYRange(-1, self.n_ch, padding=0)
+            pi.setYRange(-1, self.n_ch + 0.5, padding=0)
 
         colors = colors or {}
         self.curves = []                       # 每个通道一条曲线，各自上色
@@ -140,7 +140,7 @@ class SignalPanel(QtWidgets.QWidget):
         # 事件标记（如眨眼）：贴着横轴的短竖线，marks 为 EEG 时间（秒）
         if marks is not None and len(marks) > 0:
             m = np.asarray(marks, dtype=float) - self.axis_zero
-            ylo = -0.6 if zero_baseline else -1.0          # 与 setYRange 下限一致
+            ylo = -0.6 if zero_baseline else -1.5          # 与 setYRange 下限一致
             xs = np.repeat(m, 2)
             ys = np.tile([ylo, ylo + mark_height], len(m))
             self.mark_item = pg.PlotCurveItem(xs, ys, connect="pairs",

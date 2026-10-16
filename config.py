@@ -99,6 +99,7 @@ DEFAULT_TFR_CHANNEL = "L12"
 LINE_COLOR = (30, 30, 30)        # 找不到颜色时的默认线色
 _ROOT = Path(__file__).resolve().parent
 CHANNEL_CMAP_PATH = _ROOT / "channel_cmap.json"   # 脑电通道颜色表
+CHANNEL_ORDER_PATH = _ROOT / "channel_order.txt"
 JOINT_CMAP_PATH = _ROOT / "joint_cmap.json"       # 关节颜色表
 INVOLVEMENT_CMAP_PATH = _ROOT / "involvement_cmap.json"
 
