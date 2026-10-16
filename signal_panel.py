@@ -27,26 +27,48 @@ def load_colors(path):
 class ClickableAxis(pg.AxisItem):
     """左侧通道名坐标轴：双击某一行，回调该行对应的名字。"""
 
-    def __init__(self, *args, names=None, on_double_click=None, **kwargs):
+    def __init__(self, *args, names=None, on_double_click=None,
+                 on_alt_click=None, on_label_click=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._names = list(names or [])
         self._cb = on_double_click
+        self._alt_cb = on_alt_click
+        self._label_cb = on_label_click
+
+    def _row_name(self, ev):
+        vb = self.linkedView()
+        if vb is None or not self._names:
+            return None
+        y = vb.mapSceneToView(ev.scenePos()).y()
+        row = len(self._names) - 1 - int(round(y))
+        return self._names[row].strip() if 0 <= row < len(self._names) else None
 
     def mouseClickEvent(self, ev):
-        if ev.button() == QtCore.Qt.MouseButton.LeftButton and ev.double() and self._cb:
-            vb = self.linkedView()
-            if vb is not None and self._names:
-                y = vb.mapSceneToView(ev.scenePos()).y()
-                row = len(self._names) - 1 - int(round(y))      # 第 0 通道在最上方
-                if 0 <= row < len(self._names):
-                    self._cb(self._names[row].strip())
-            ev.accept()
-            return
+        if ev.button() == QtCore.Qt.MouseButton.LeftButton:
+            if (self._label_cb and not ev.double()
+                    and self.label.sceneBoundingRect().contains(ev.scenePos())):
+                self._label_cb()
+                ev.accept()
+                return
+            if (self._alt_cb and ev.modifiers() & QtCore.Qt.KeyboardModifier.AltModifier):
+                name = self._row_name(ev)
+                if name is not None:
+                    self._alt_cb(name)
+                ev.accept()
+                return
+            if ev.double() and self._cb:
+                name = self._row_name(ev)
+                if name is not None:
+                    self._cb(name)
+                ev.accept()
+                return
         super().mouseClickEvent(ev)
 
 class SignalPanel(QtWidgets.QWidget):
     gainChanged = QtCore.Signal(float)     # 当前灵敏度 (数据单位 / 通道间距)
     channelDoubleClicked = QtCore.Signal(str)   # 双击左侧通道名
+    channelAltClicked = QtCore.Signal(str)
+    axisLabelClicked = QtCore.Signal()    
 
     def __init__(self, data, names, fs, clock, colors=None, t_offset=0.0,
                  unit_per_spacing=100.0, remove_mean=False, zero_baseline=False,
@@ -70,7 +92,9 @@ class SignalPanel(QtWidgets.QWidget):
         self.offsets = np.arange(self.n_ch - 1, -1, -1, dtype=np.float32)[:, None]
 
         left_axis = ClickableAxis("left", names=names,
-                                  on_double_click=self.channelDoubleClicked.emit)
+                                  on_double_click=self.channelDoubleClicked.emit,
+                                  on_alt_click=self.channelAltClicked.emit,
+                                  on_label_click=self.axisLabelClicked.emit)
         self.plot = pg.PlotWidget(axisItems={"left": left_axis})
         self.plot.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)        
         lay = QtWidgets.QVBoxLayout(self)

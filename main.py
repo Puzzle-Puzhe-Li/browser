@@ -19,7 +19,6 @@ from selection import SelectionHost, SelectionOverlay, SelectionController
 from ica_colors import compute_ica_colors
 from overview_bar import OverviewBar
 
-
 class HelpDialog(QtWidgets.QDialog):
     ROWS = [
         ("键盘", None),
@@ -39,6 +38,8 @@ class HelpDialog(QtWidgets.QDialog):
         ("暂停时拖动框选", "选择时间段并设置动作类型"),
         ("右键动作类型栏", "撤销 / 导入 / 导出"),
         ("点击进度条或色条", "跳转到对应时间"),
+        ("Alt + 左键点 ICA 通道名", "查看该 IC 的详细图"),
+        ("点击 ICA 纵轴标签", "查看全部 IC 的 topomap"),        
     ]
 
     def __init__(self, parent=None):
@@ -335,13 +336,28 @@ class MainWindow(QtWidgets.QWidget):
         self.eeg_panel.channelDoubleClicked.connect(self.tfr_panel.set_channel)
         if self.ica_panel is not None:
             self.ica_panel.channelDoubleClicked.connect(self._ica_tfr)        
+            self.ica_panel.channelAltClicked.connect(self._show_ic)
+            self.ica_panel.axisLabelClicked.connect(self._show_topomap)
 
         self._on_time(0.0)
         self._refresh_info()
         self.setMinimumSize(640, 480)
 
     def _ica_tfr(self, disp_name):
-        self.tfr_panel.set_channel(self._ica_name_map.get(disp_name, disp_name))        
+        self.tfr_panel.set_channel(self._ica_name_map.get(disp_name, disp_name))  
+
+    def _show_image(self, path, title):
+        if not path.exists():
+            QtWidgets.QMessageBox.warning(self, "找不到图片", str(path))
+            return
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(path)))
+
+    def _show_ic(self, disp_name):
+        i = list(self._ica_name_map).index(disp_name)
+        self._show_image(config.ica_img_dir(self._session) / f"IC{i:03d}.png", disp_name)
+
+    def _show_topomap(self):
+        self._show_image(config.ica_img_dir(self._session) / config.ICA_TOPOMAP_NAME, "ICA topomap")              
 
     def _goto(self):
         t = self.clock.time

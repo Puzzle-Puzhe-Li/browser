@@ -50,6 +50,11 @@ REMOVE_WINDOW_MEAN = True      # 显示时减去窗口内均值，避免基线�
 def ica_path(session):
     return DATA_ROOT / "ecog" / f"ecog_{session}_cropped_filtered_rereferred_annotated_+ic.bdf"
 
+def ica_img_dir(session):
+    return DATA_ROOT / "ecog" / "ica" / session
+
+ICA_TOPOMAP_NAME = "topomap.png"
+
 def ica_fif_path(session):
     return DATA_ROOT / "ecog" / f"ica_{session}.fif"
 
