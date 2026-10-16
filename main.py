@@ -19,6 +19,43 @@ from selection import SelectionHost, SelectionOverlay, SelectionController
 from ica_colors import compute_ica_colors
 from overview_bar import OverviewBar
 
+class GotoDialog(QtWidgets.QDialog):
+    def __init__(self, t_sample, t_video, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("时间定位")
+        self.kind = None
+        self.value = 0.0
+        self.sample_edit = QtWidgets.QLineEdit(f"{t_sample:.2f}")
+        self.video_edit = QtWidgets.QLineEdit(self._fmt_mmss(t_video))
+        form = QtWidgets.QFormLayout(self)
+        form.addRow("样本时间 (s)", self.sample_edit)
+        form.addRow("视频时间 (mm:ss)", self.video_edit)
+        self.sample_edit.returnPressed.connect(lambda: self._submit("sample", self.sample_edit))
+        self.video_edit.returnPressed.connect(lambda: self._submit("video", self.video_edit))
+        self.sample_edit.selectAll()
+
+    @staticmethod
+    def _fmt_mmss(s):
+        cs = int(round(abs(s) * 100))
+        m, r = divmod(cs, 6000)
+        return f"{'-' if s < 0 else ''}{m:02d}:{r / 100:05.2f}"
+
+    @staticmethod
+    def _parse_mmss(text):
+        text = text.strip()
+        neg = text.startswith("-")
+        v = 0.0
+        for p in text.lstrip("-").split(":"):
+            v = v * 60 + float(p)
+        return -v if neg else v
+
+    def _submit(self, kind, edit):
+        try:
+            v = self._parse_mmss(edit.text()) if kind == "video" else float(edit.text().strip())
+        except ValueError:
+            return
+        self.kind, self.value = kind, v
+        self.accept()
 
 class JumpSlider(QtWidgets.QSlider):
     """点击滑条任意位置直接跳转。"""
@@ -172,7 +209,8 @@ class MainWindow(QtWidgets.QWidget):
         self.hint = QtWidgets.QLabel(
             "空格 播放/暂停   ←/→ ±1 s   PgUp/PgDn ±10 s   Shift+←/→ 上/下一段起点   Ctrl+←/→ ±1 帧   "
             "小键盘 +/- 纵轴比例尺   * / 播放速度加/减   Home/End 首/尾   双击脑电通道名 切换TFR通道   双击时间轴标签 切换时间轴(样本相对/视频)   "
-            "暂停时拖动框选时间段→选择动作类型   Ctrl+Z 撤销   右键运动类型栏 导出/导入")
+            "暂停时拖动框选时间段→选择动作类型   Ctrl+Z 撤销   右键运动类型栏 导出/导入"
+            "G 时间定位   ")
 
         self.overview = OverviewBar(self.inv_model, self.clock, height=4)
         slider_col = QtWidgets.QVBoxLayout()
@@ -243,6 +281,14 @@ class MainWindow(QtWidgets.QWidget):
         self._on_time(0.0)
         self._refresh_info()
         self.setMinimumSize(640, 480)
+
+    def _goto(self):
+        t = self.clock.time
+        dlg = GotoDialog(t - self.t0, t - self.v0, self)
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            base = self.t0 if dlg.kind == "sample" else self.v0
+            self.clock.seek(base + dlg.value)
+        self.setFocus()
 
     def _update_title(self, dirty=None):
         d = self.inv_model.dirty if dirty is None else dirty
@@ -407,6 +453,8 @@ class MainWindow(QtWidgets.QWidget):
             self.clock.seek(0)
         elif k == K.Key_End:
             self.clock.seek(self.clock.duration)
+        elif k == K.Key_G:
+            self._goto()            
         else:
             super().keyPressEvent(e)
 
