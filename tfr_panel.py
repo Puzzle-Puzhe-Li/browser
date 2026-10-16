@@ -2,6 +2,7 @@
 
 整段数据对选定通道只计算一次（Morlet 小波，分块 + 降采样），之后每帧只切片显示。
 功率单位：数据 µV 先转为 V，再 10*log10(V^2)。
+纵轴为对数频率轴：TFR 本身仍按线性频率计算，显示时重采样到对数均匀的行上。
 """
 import hashlib
 
@@ -11,6 +12,12 @@ from mne.time_frequency import tfr_array_morlet
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 import config
+
+# 纵轴刻度（Hz）与对数显示的行数
+FREQ_TICKS = (1, 4, 8, 13, 30, 80, 150)
+N_LOG_ROWS = 200
+FREQ_OFFSET = 10.0
+
 
 class SmoothImageItem(pg.ImageItem):
     """绘制时启用平滑插值（类似 gouraud shading）。"""
@@ -71,6 +78,14 @@ class TFRPanel(QtWidgets.QWidget):
         self.out_fs = float(config.TFR_FS)
         self.df = float(self.freqs[1] - self.freqs[0]) if len(self.freqs) > 1 else 1.0
 
+        # ---- 对数频率轴：线性频率行 → 对数均匀行的插值矩阵 ----
+        self.f_lo = max(float(self.freqs[0] - self.df / 2), 1e-3)   # 图像下沿 (Hz)
+        self.f_hi = float(self.freqs[-1] + self.df / 2)             # 图像上沿 (Hz)
+        self.log_lo, self.log_hi = np.log10(self.f_lo + FREQ_OFFSET), np.log10(self.f_hi + FREQ_OFFSET)        
+        step = (self.log_hi - self.log_lo) / N_LOG_ROWS
+        centers = 10.0 ** (self.log_lo + (np.arange(N_LOG_ROWS) + 0.5) * step) - FREQ_OFFSET
+        self._W = self._interp_matrix(self.freqs, centers)          # (N_LOG_ROWS, n_freqs)
+
         self._cache = {}                        # 通道名 -> (n_freqs, n_t) dB
         self._tfr = None
         self.channel = None
@@ -96,10 +111,15 @@ class TFRPanel(QtWidgets.QWidget):
         font.setPointSize(5)                      # 与脑电通道名一致
         for side in ("left", "bottom"):
             pi.getAxis(side).setStyle(tickFont=font)
-        pi.getAxis("left").setWidth(config.AXIS_WIDTH)
+        left = pi.getAxis("left")
+        left.setWidth(config.AXIS_WIDTH)
+        left.setTicks([[(float(np.log10(v + FREQ_OFFSET)), f"{v:g}") for v in FREQ_TICKS]])
         pi.setLabel("bottom", "时间 (s)")
         pi.setLabel("left", "Frequency (Hz)")
-        pi.setYRange(self.freqs[0] - self.df / 2, self.freqs[-1] + self.df / 2, padding=0)
+        # y 轴坐标 = log10(频率)；范围覆盖所有刻度
+        y_lo = min(self.log_lo, np.log10(min(FREQ_TICKS) + FREQ_OFFSET))
+        y_hi = max(self.log_hi, np.log10(max(FREQ_TICKS) + FREQ_OFFSET)) + 0.05
+        pi.setYRange(y_lo, y_hi, padding=0)
 
         self.img = SmoothImageItem()
         self.img.setLookupTable(jet_lut())
@@ -114,6 +134,21 @@ class TFRPanel(QtWidgets.QWidget):
             channel = self.names[0]
         self.set_channel(channel)
         clock.timeChanged.connect(self.update_view)
+
+    @staticmethod
+    def _interp_matrix(freqs, targets):
+        """线性插值矩阵 W：W @ x(freqs) ≈ x(targets)，目标频率超出范围时取端点值。"""
+        W = np.zeros((len(targets), len(freqs)), dtype=np.float32)
+        for j, f in enumerate(targets):
+            k = int(np.searchsorted(freqs, f))
+            if k <= 0:
+                W[j, 0] = 1.0
+            elif k >= len(freqs):
+                W[j, -1] = 1.0
+            else:
+                w = (f - freqs[k - 1]) / (freqs[k] - freqs[k - 1])
+                W[j, k - 1], W[j, k] = 1.0 - w, w
+        return W
 
     # ---- 对外接口 ----
     def set_channel(self, name):
@@ -169,7 +204,8 @@ class TFRPanel(QtWidgets.QWidget):
             return
 
         seg = self._tfr[:, k0:k1]                       # (n_freqs, n_cols)
-        self.img.setImage(seg.T, autoLevels=False, levels=config.TFR_DB_RANGE)
+        seg_log = self._W @ seg                         # (N_LOG_ROWS, n_cols)，行按对数频率均匀排列
+        self.img.setImage(seg_log.T, autoLevels=False, levels=config.TFR_DB_RANGE)
         x0 = (k0 - 0.5) / self.out_fs - self.axis_zero
-        self.img.setRect(QtCore.QRectF(x0, self.freqs[0] - self.df / 2,
-                                       (k1 - k0) / self.out_fs, len(self.freqs) * self.df))
+        self.img.setRect(QtCore.QRectF(x0, self.log_lo,
+                                       (k1 - k0) / self.out_fs, self.log_hi - self.log_lo))
