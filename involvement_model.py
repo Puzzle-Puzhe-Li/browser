@@ -5,6 +5,7 @@ from pyqtgraph.Qt import QtCore
 
 MERGE_EPS = 1e-6   # 两段首尾相差不超过该值（秒）即视为相连
 REQUIRED_COLS = {"Onset", "Duration", "Annotation", "Involvement"}
+CLEAR_LABEL = "Clear"
 
 
 class InvolvementModel(QtCore.QObject):
@@ -91,24 +92,28 @@ class InvolvementModel(QtCore.QObject):
                 if e > t1:
                     post.append((t1, e, l, meta))
 
-        ns, ne = t0, t1
-        merged_meta = None
-        while pre and pre[-1][2] == label and abs(pre[-1][1] - ns) <= MERGE_EPS:
-            s, e, l, meta = pre.pop()
-            ns = min(ns, s)
-            merged_meta = dict(meta)
-        while post and post[0][2] == label and abs(post[0][0] - ne) <= MERGE_EPS:
-            s, e, l, meta = post.pop(0)
-            ne = max(ne, e)
-            if merged_meta is None:
-                merged_meta = dict(meta)
-
-        if merged_meta is None:
-            merged_meta = {"Annotation": "manual_edit"}
+        if label == CLEAR_LABEL:
+            out = pre + post
         else:
-            merged_meta["Annotation"] = "manual_edit"
+            ns, ne = t0, t1
+            merged_meta = None
+            while pre and pre[-1][2] == label and abs(pre[-1][1] - ns) <= MERGE_EPS:
+                s, e, l, meta = pre.pop()
+                ns = min(ns, s)
+                merged_meta = dict(meta)
+            while post and post[0][2] == label and abs(post[0][0] - ne) <= MERGE_EPS:
+                s, e, l, meta = post.pop(0)
+                ne = max(ne, e)
+                if merged_meta is None:
+                    merged_meta = dict(meta)
 
-        out = pre + [(ns, ne, label, merged_meta)] + post
+            if merged_meta is None:
+                merged_meta = {"Annotation": "manual_edit"}
+            else:
+                merged_meta["Annotation"] = "manual_edit"
+
+            out = pre + [(ns, ne, label, merged_meta)] + post
+            
         out.sort(key=lambda x: x[0])
         if out == self.segs:
             return

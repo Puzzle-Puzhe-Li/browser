@@ -14,7 +14,7 @@ from involvement_panel import InvolvementPanel
 
 from motion_loader import (load_speed_csv, load_blink_times,
                            load_video_intercept, load_involvement_table)
-from involvement_model import InvolvementModel
+from involvement_model import InvolvementModel, CLEAR_LABEL
 from selection import SelectionHost, SelectionOverlay, SelectionController
 from ica_colors import compute_ica_colors
 from overview_bar import OverviewBar
@@ -388,6 +388,11 @@ class MainWindow(QtWidgets.QWidget):
             act = m.addAction(QtGui.QIcon(pm), name)
             act.triggered.connect(
                 lambda _=False, n=name: self.inv_model.assign(a, b, n))
+        pm = QtGui.QPixmap(12, 12)
+        pm.fill(QtGui.QColor(255, 255, 255))
+        act = m.addAction(QtGui.QIcon(pm), CLEAR_LABEL)
+        act.triggered.connect(
+            lambda _=False: self.inv_model.assign(a, b, CLEAR_LABEL))            
         m.addSeparator()
         m.addAction("取消")
         m.exec(gp)
