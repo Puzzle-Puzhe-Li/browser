@@ -23,6 +23,7 @@ class VideoPanel(QtWidgets.QWidget):
         self._last = -1
         self._img = None
         self._buf = None                         # 保持 numpy 缓冲区存活，供 QImage 引用
+        self.inv_color_at = None
 
         # 忽略 sizeHint，宽高完全由布局的 stretch 决定
         self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Ignored,
@@ -42,6 +43,7 @@ class VideoPanel(QtWidgets.QWidget):
                 self.update()
             return
         if idx == self._last:
+            self.update()
             return
 
         gap = idx - self._last
@@ -61,6 +63,9 @@ class VideoPanel(QtWidgets.QWidget):
         self._img = QtGui.QImage(rgb.data, w, h, 3 * w, QtGui.QImage.Format.Format_RGB888)
         self.update()
 
+    def _inv_color(self, t):
+        return self.inv_color_at(t) if self.inv_color_at is not None else None        
+
     def paintEvent(self, e):
         p = QtGui.QPainter(self)
         p.fillRect(self.rect(), QtGui.QColor(0, 0, 0))
@@ -71,6 +76,11 @@ class VideoPanel(QtWidgets.QWidget):
         w, h = self._img.width() * s, self._img.height() * s
         p.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
         p.drawImage(QtCore.QRectF((W - w) / 2, (H - h) / 2, w, h), self._img)
+        col = self._inv_color(self.clock.time)
+        if col is not None:
+            p.fillRect(QtCore.QRectF(8, 8, 18, 18), QtGui.QColor(*col))
+            p.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255), 1))
+            p.drawRect(QtCore.QRectF(8, 8, 18, 18))        
 
     def release(self):
         self.cap.release()

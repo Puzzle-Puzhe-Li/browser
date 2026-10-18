@@ -225,6 +225,10 @@ class MainWindow(QtWidgets.QWidget):
         print(f"[动作类型] {len(self.inv_model.segs)} 段")
         self.inv_panel = InvolvementPanel(self.inv_model, self.clock,
                                           axis_zero=self.t0, session=session)
+        if self.video_panel is not None:
+            self.video_panel.inv_color_at = self._inv_color_at
+            self.inv_model.changed.connect(self.video_panel.update)
+
         extra = None
         if ica is not None:
             extra = {f"{session}_ica": (ica.data, [n.strip() for n in ica.names], ica_off)}
@@ -342,6 +346,12 @@ class MainWindow(QtWidgets.QWidget):
         self._on_time(0.0)
         self._refresh_info()
         self.setMinimumSize(640, 480)
+        
+    def _inv_color_at(self, t):
+        for s, e, l, _ in self.inv_model.segs:
+            if s <= t < e:
+                return self.inv_panel.color_of(l)
+        return None
 
     def _ica_tfr(self, disp_name):
         self.tfr_panel.set_channel(self._ica_name_map.get(disp_name, disp_name))  

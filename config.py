@@ -85,7 +85,7 @@ WINDOW_SCREEN_FRAC = (0.95, 0.92)   # 窗口占屏幕可用区域的 (宽, 高) 
 
 # ---- 速度显示 ----
 SPEED_YPAD_TOP = 2.0
-SPEED_PER_SPACING = 20     # 初始灵敏度：取全部速度值的该百分位作为一个通道间距
+SPEED_PER_SPACING = 10     # 初始灵敏度：取全部速度值的该百分位作为一个通道间距
 
 # ---- TFR ----
 import numpy as np
