@@ -21,6 +21,7 @@ FREQ_OFFSET = 10.0
 class TimeAxis(pg.AxisItem):
     """offset 为 None 时按样本相对时间显示；否则按 mm:ss 显示视频时间。双击轴标签触发回调。"""
     offset = None
+    slope = 1.0
     on_double_click = None
 
     def tickStrings(self, values, scale, spacing):
@@ -28,7 +29,7 @@ class TimeAxis(pg.AxisItem):
             return super().tickStrings(values, scale, spacing)
         out = []
         for v in values:
-            sec = int(round(v + self.offset))
+            sec = int(round((v + self.offset) / self.slope))
             m, s = divmod(abs(sec), 60)
             out.append(f"{'-' if sec < 0 else ''}{m:02d}:{s:02d}")
         return out
@@ -90,7 +91,7 @@ def compute_tfr_db(x_uv, fs, freqs, n_cycles, out_fs, progress=None):
 
 class TFRPanel(QtWidgets.QWidget):
     def __init__(self, data, names, fs, clock, axis_zero=0.0, cache_tag="",
-                 channel=None, video_t0=None, extra=None, parent=None):
+                 channel=None, video_t0=None, video_slope=1.0, extra=None, parent=None):
         super().__init__(parent)
         self.data = data
         self._n_t = -(-data.shape[1] // max(1, int(round(fs / config.TFR_FS))))        
@@ -103,6 +104,7 @@ class TFRPanel(QtWidgets.QWidget):
         self.clock = clock
         self.axis_zero = float(axis_zero)
         self.video_t0 = video_t0
+        self.video_slope = float(video_slope)
         self.video_mode = False        
         self.cache_tag = cache_tag
         self.half = config.WINDOW_SEC / 2.0
@@ -190,6 +192,7 @@ class TFRPanel(QtWidgets.QWidget):
             return
         self.video_mode = not self.video_mode
         self.time_axis.offset = (self.axis_zero - self.video_t0) if self.video_mode else None
+        self.time_axis.slope = self.video_slope
         self.plot.getPlotItem().setLabel(
             "bottom", "视频时间 (mm:ss)" if self.video_mode else "样本相对时间 (s)")
         self.time_axis.picture = None

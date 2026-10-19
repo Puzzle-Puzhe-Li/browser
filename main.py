@@ -13,7 +13,7 @@ from tfr_panel import TFRPanel
 from involvement_panel import InvolvementPanel
 
 from motion_loader import (load_speed_csv, load_blink_times,
-                           load_video_intercept, load_involvement_table)
+                           load_video_sync, load_involvement_table)
 from involvement_model import InvolvementModel, CLEAR_LABEL
 from selection import SelectionHost, SelectionOverlay, SelectionController
 from ica_colors import compute_ica_colors
@@ -133,9 +133,9 @@ class MainWindow(QtWidgets.QWidget):
             self.t0, self.t0_src = config.EEG_OFFSET, "默认偏移"
 
         # 视频 0 秒在 EEG 时间轴上的位置
-        self.video_intercept = (load_video_intercept(config.sync_model_path(session))
-                                if config.USE_VIDEO_SYNC else 0.0)
-        print(f"[同步] 视频截距 {self.video_intercept:.4f} s")
+        self.video_slope, self.video_intercept = (load_video_sync(config.sync_model_path(session))
+                                                  if config.USE_VIDEO_SYNC else (1.0, 0.0))
+        print(f"[同步] 视频斜率 {self.video_slope:.6f}, 截距 {self.video_intercept:.4f} s")
         if eeg.video_start is not None:
             self.v0, self.v0_src = eeg.video_start + \
                 config.VIDEO_OFFSET + self.video_intercept, "BDF 标注"
@@ -157,14 +157,14 @@ class MainWindow(QtWidgets.QWidget):
         if vpath.exists():
             try:
                 self.video_panel = VideoPanel(
-                    vpath, self.clock, t_offset=self.v0)
+                    vpath, self.clock, t_offset=self.v0, slope=self.video_slope)
             except OSError as ex:
                 print(f"[视频] {ex}")
         else:
             print(f"[视频] 未找到 {vpath}")
 
         # 单帧步长使用的帧率：优先用视频真实帧率，没有视频则用 config.FPS
-        self.frame_fps = self.video_panel.fps if self.video_panel is not None else config.FPS
+        self.frame_fps = (self.video_panel.fps if self.video_panel is not None else config.FPS) / self.video_slope
         W, H, video_w = self._plan_geometry()
         self.resize(W, H)
 
@@ -237,6 +237,7 @@ class MainWindow(QtWidgets.QWidget):
             axis_zero=self.t0, cache_tag=session,
             channel=config.DEFAULT_TFR_CHANNEL,
             video_t0=self.v0 if self.video_panel is not None else None,
+            video_slope=self.video_slope,
             extra=extra)
 
         for p in (self.speed_panel, self.eeg_panel, self.tfr_panel):
@@ -346,7 +347,7 @@ class MainWindow(QtWidgets.QWidget):
         self._on_time(0.0)
         self._refresh_info()
         self.setMinimumSize(640, 480)
-        
+
     def _inv_color_at(self, t):
         for s, e, l, _ in self.inv_model.segs:
             if s <= t < e:
@@ -371,10 +372,12 @@ class MainWindow(QtWidgets.QWidget):
 
     def _goto(self):
         t = self.clock.time
-        dlg = GotoDialog(t - self.t0, t - self.v0, self)
+        dlg = GotoDialog(t - self.t0, (t - self.v0) / self.video_slope, self)
         if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
-            base = self.t0 if dlg.kind == "sample" else self.v0
-            self.clock.seek(base + dlg.value)
+            if dlg.kind == "sample":
+                self.clock.seek(self.t0 + dlg.value)
+            else:
+                self.clock.seek(self.v0 + self.video_slope * dlg.value)
         self.setFocus()
 
     def _update_title(self, dirty=None):

@@ -47,15 +47,14 @@ def load_blink_times(path):
     t = pd.to_numeric(df["eog_time"], errors="coerce").dropna().to_numpy(dtype=float)
     return np.sort(t)
 
-def load_video_intercept(path):
-    """读取 video→ecog 线性同步模型的截距（秒）。失败返回 0.0。"""
+def load_video_sync(path):
     try:
         import joblib
         model = joblib.load(path)
-        return float(model.intercept_)
+        return float(model.coef_[0]), float(model.intercept_)
     except Exception as ex:
-        print(f"[同步] 读取失败，截距按 0 处理: {ex}")
-        return 0.0
+        print(f"[同步] 读取失败，斜率按 1、截距按 0 处理: {ex}")
+        return 1.0, 0.0
 
 
 def load_involvement(path):

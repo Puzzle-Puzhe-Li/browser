@@ -7,13 +7,14 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import config
 
 class VideoPanel(QtWidgets.QWidget):
-    def __init__(self, path, clock, t_offset=0.0, parent=None):
+    def __init__(self, path, clock, t_offset=0.0, slope=1.0, parent=None):
         super().__init__(parent)
         self.cap = cv2.VideoCapture(str(path))
         if not self.cap.isOpened():
             raise OSError(f"无法打开视频: {path}")
         self.clock = clock
         self.t_offset = float(t_offset)          # 视频 0 秒对应的 EEG 时间
+        self.slope = float(slope)
         self.vw = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.vh = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
@@ -36,7 +37,7 @@ class VideoPanel(QtWidgets.QWidget):
         return self.n_frames / self.fps
 
     def update_view(self, t):
-        idx = int(math.floor((t - self.t_offset) * self.fps + 1e-6))
+        idx = int(math.floor((t - self.t_offset) / self.slope * self.fps + 1e-6))
         if idx < 0 or idx >= self.n_frames:      # 视频覆盖范围之外：显示黑屏
             if self._img is not None:
                 self._img, self._last = None, -1
