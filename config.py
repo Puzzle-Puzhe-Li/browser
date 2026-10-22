@@ -58,6 +58,9 @@ ICA_TOPOMAP_NAME = "topomap.png"
 def ica_fif_path(session):
     return DATA_ROOT / "ecog" / f"ica_{session}.fif"
 
+def ica_annotation_path(session):
+    return DATA_ROOT / "ecog" / f"ecog_{session}_cropped_filtered_rereferred_+ic_annotations.csv"
+
 ICA_PREFIX = "ICA"             # 只取名字以此开头的通道（不区分大小写）
 ICA_UV_PER_SPACING = 60.0      # ICA 面板初始灵敏度，按实际幅值调
 

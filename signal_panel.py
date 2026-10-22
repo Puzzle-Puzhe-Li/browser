@@ -74,7 +74,7 @@ class SignalPanel(QtWidgets.QWidget):
                  unit_per_spacing=100.0, remove_mean=False, zero_baseline=False,
                  show_time_axis=True, axis_zero=0.0, 
                  marks=None, mark_color=(70, 70, 70), mark_height=0.35,
-                 ylabel=None, y_top_pad=None, parent=None):
+                 ylabel=None, y_top_pad=None, shade=None, shade_color=(225, 225, 225), parent=None):
         super().__init__(parent)
         self.data = data
         self.names = names
@@ -136,6 +136,14 @@ class SignalPanel(QtWidgets.QWidget):
             c = pg.PlotCurveItem(pen=pg.mkPen(color, width=1))
             pi.addItem(c)
             self.curves.append(c)
+            
+        for a, b in (shade or []):
+            r = pg.LinearRegionItem((a - self.axis_zero, b - self.axis_zero), movable=False,
+                                    brush=pg.mkBrush(*shade_color))
+            for ln in r.lines:
+                ln.setPen(pg.mkPen(None))
+            r.setZValue(-10)
+            pi.addItem(r)
 
         # 事件标记（如眨眼）：贴着横轴的短竖线，marks 为 EEG 时间（秒）
         if marks is not None and len(marks) > 0:

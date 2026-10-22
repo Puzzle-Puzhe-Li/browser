@@ -93,3 +93,24 @@ def load_involvement_table(path):
     except Exception as ex:
         print(f"[动作类型] 读取失败: {ex}")
         return None
+
+
+def load_bad_spans(path):
+    try:
+        df = pd.read_csv(path, encoding="utf-8-sig")
+    except Exception as ex:
+        print(f"[bad段] 读取失败: {ex}")
+        return []
+    df.columns = [str(c).strip() for c in df.columns]
+    if not {"Onset", "Duration", "Annotation"}.issubset(df.columns):
+        print(f"[bad段] 列不全，现有列: {list(df.columns)}")
+        return []
+    ann = df["Annotation"].astype(str).str.strip().str.lower()
+    onset = pd.to_numeric(df["Onset"], errors="coerce")
+    dur = pd.to_numeric(df["Duration"], errors="coerce")
+    is_ss = ann == "sample_start"
+    ss = float(onset[is_ss].iloc[0]) if is_ss.any() else 0.0
+    if not is_ss.any():
+        print("[bad段] 表中没有 sample_start 行，按 0 处理")
+    is_bad = ann.str.startswith("bad") & onset.notna() & dur.notna()
+    return [(float(o - ss), float(o + d - ss)) for o, d in zip(onset[is_bad], dur[is_bad])]

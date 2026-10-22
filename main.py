@@ -13,7 +13,7 @@ from tfr_panel import TFRPanel
 from involvement_panel import InvolvementPanel
 
 from motion_loader import (load_speed_csv, load_blink_times,
-                           load_video_sync, load_involvement_table)
+                           load_video_sync, load_involvement_table, load_bad_spans)
 from involvement_model import InvolvementModel, CLEAR_LABEL
 from selection import SelectionHost, SelectionOverlay, SelectionController
 from ica_colors import compute_ica_colors
@@ -168,6 +168,9 @@ class MainWindow(QtWidgets.QWidget):
         W, H, video_w = self._plan_geometry()
         self.resize(W, H)
 
+        bad_spans = [(a + self.t0, b + self.t0) for a, b in load_bad_spans(config.ica_annotation_path(session))]
+        print(f"[bad段] {len(bad_spans)} 段")
+
         self.speed_panel = SignalPanel(
             speed.data, speed.names, speed.fs, self.clock,
             colors=load_colors(config.JOINT_CMAP_PATH),
@@ -184,7 +187,7 @@ class MainWindow(QtWidgets.QWidget):
             zero_baseline=False, show_time_axis=False, axis_zero=self.t0,
             marks=self.blink_times, mark_color=config.BLINK_COLOR,
             mark_height=config.BLINK_TICK_HEIGHT,
-            ylabel="EEG (μV)")
+            ylabel="EEG (μV)", shade=bad_spans)
 
         self.ica_panel = None
         if ica is not None:
@@ -217,7 +220,7 @@ class MainWindow(QtWidgets.QWidget):
                 unit_per_spacing=config.ICA_UV_PER_SPACING,
                 remove_mean=config.REMOVE_WINDOW_MEAN,
                 zero_baseline=False, show_time_axis=False, axis_zero=self.t0,
-                ylabel="ICA")
+                ylabel="ICA", shade=bad_spans)
             self.ica_panel.setMinimumSize(100, 50)
 
         inv_df = load_involvement_table(config.involvement_path(session))
