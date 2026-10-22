@@ -3,7 +3,7 @@ from pathlib import Path
 
 # ---- 数据位置 ----
 DATA_ROOT = Path(r"F:\bmi_free_01\data")
-SESSIONS = ["A0", "B1"]
+SESSIONS = ["A0", 'B0', "B1"]
 
 
 def eeg_path(session):
