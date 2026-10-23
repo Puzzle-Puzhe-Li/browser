@@ -26,9 +26,24 @@ class SelectionOverlay(QtWidgets.QWidget):
         self.setGeometry(host.rect())
         self.raise_()
 
+    def _edges(self):
+        if self.sel is None:
+            return None
+        return self._x(self.sel[0]), self._x(self.sel[1])
+
     def set_selection(self, a, b=None):
+        old = self._edges()
         self.sel = None if a is None else (min(a, b), max(a, b))
-        self.update()
+        new = self._edges()
+        if old is None and new is None:
+            return
+        if old is None or new is None:
+            self.update()
+            return
+        h = self.height()
+        for o, n in zip(old, new):
+            lo, hi = min(o, n) - 3, max(o, n) + 3
+            self.update(QtCore.QRect(lo, 0, hi - lo, h))
 
     def _x(self, t):
         pw = self.ref.plot
