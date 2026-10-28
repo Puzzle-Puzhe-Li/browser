@@ -15,6 +15,7 @@ import config
 
 # 纵轴刻度（Hz）与对数显示的行数
 FREQ_TICKS = (1, 4, 8, 13, 30, 80, 150)
+LIN_TICKS = (20, 40, 60, 80, 100, 120, 140)
 N_LOG_ROWS = 200
 FREQ_OFFSET = 10.0
 
@@ -43,7 +44,17 @@ class TimeAxis(pg.AxisItem):
             return
         super().mouseClickEvent(ev)
 
+class FreqAxis(pg.AxisItem):
+    on_double_click = None
 
+    def mouseClickEvent(self, ev):
+        if (ev.button() == QtCore.Qt.MouseButton.LeftButton and ev.double()
+                and self.on_double_click is not None
+                and not self.label.sceneBoundingRect().contains(ev.scenePos())):
+            self.on_double_click()
+            ev.accept()
+            return
+        super().mouseClickEvent(ev)
 
 
 class SmoothImageItem(pg.ImageItem):
@@ -121,6 +132,7 @@ class TFRPanel(QtWidgets.QWidget):
         centers = 10.0 ** (self.log_lo + (np.arange(N_LOG_ROWS) + 0.5) * step) - FREQ_OFFSET
         self._W = self._interp_matrix(self.freqs, centers)          # (N_LOG_ROWS, n_freqs)
 
+        self.log_mode = False
         self._cache = {}                        # 通道名 -> (n_freqs, n_t) dB
         self._tfr = None
         self.channel = None
@@ -136,7 +148,9 @@ class TFRPanel(QtWidgets.QWidget):
 
         self.time_axis = TimeAxis("bottom")
         self.time_axis.on_double_click = self.toggle_time_mode
-        self.plot = pg.PlotWidget(axisItems={"bottom": self.time_axis})
+        self.freq_axis = FreqAxis("left")
+        self.freq_axis.on_double_click = self.toggle_log_mode
+        self.plot = pg.PlotWidget(axisItems={"bottom": self.time_axis, "left": self.freq_axis})
         self.plot.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)        
         lay.addWidget(self.plot, 1)
 
@@ -150,13 +164,9 @@ class TFRPanel(QtWidgets.QWidget):
             pi.getAxis(side).setStyle(tickFont=font)
         left = pi.getAxis("left")
         left.setWidth(config.AXIS_WIDTH)
-        left.setTicks([[(float(np.log10(v + FREQ_OFFSET)), f"{v:g}") for v in FREQ_TICKS]])
         pi.setLabel("bottom", "样本相对时间 (s)")
         pi.setLabel("left", "Frequency (Hz)")
-        # y 轴坐标 = log10(频率)；范围覆盖所有刻度
-        y_lo = min(self.log_lo, np.log10(min(FREQ_TICKS) + FREQ_OFFSET))
-        y_hi = max(self.log_hi, np.log10(max(FREQ_TICKS) + FREQ_OFFSET)) + 0.05
-        pi.setYRange(y_lo, y_hi, padding=0)
+        self._apply_axis()
 
         self.img = SmoothImageItem()
         self.img.setLookupTable(jet_lut())
@@ -197,6 +207,23 @@ class TFRPanel(QtWidgets.QWidget):
             "bottom", "视频时间 (mm:ss)" if self.video_mode else "样本相对时间 (s)")
         self.time_axis.picture = None
         self.time_axis.update()    
+
+    def _apply_axis(self):
+        pi = self.plot.getPlotItem()
+        if self.log_mode:
+            ticks = [(float(np.log10(v + FREQ_OFFSET)), f"{v:g}") for v in FREQ_TICKS]
+            y_lo = min(self.log_lo, np.log10(min(FREQ_TICKS) + FREQ_OFFSET))
+            y_hi = max(self.log_hi, np.log10(max(FREQ_TICKS) + FREQ_OFFSET)) + 0.05
+        else:
+            ticks = [(float(v), f"{v:g}") for v in LIN_TICKS]
+            y_lo, y_hi = self.f_lo, self.f_hi
+        pi.getAxis("left").setTicks([ticks])
+        pi.setYRange(y_lo, y_hi, padding=0)
+
+    def toggle_log_mode(self):
+        self.log_mode = not self.log_mode
+        self._apply_axis()
+        self.update_view(self.clock.time)
 
     # ---- 对外接口 ----
     def set_channel(self, name):
@@ -262,9 +289,12 @@ class TFRPanel(QtWidgets.QWidget):
             self.img.clear()
             return
 
-        seg = self._tfr[:, k0:k1]                       # (n_freqs, n_cols)
-        seg_log = self._W @ seg                         # (N_LOG_ROWS, n_cols)，行按对数频率均匀排列
-        self.img.setImage(seg_log.T, autoLevels=False, levels=config.TFR_DB_RANGE)
+        seg = self._tfr[:, k0:k1]
+        if self.log_mode:
+            seg = self._W @ seg
+            y0, y1 = self.log_lo, self.log_hi
+        else:
+            y0, y1 = self.f_lo, self.f_hi
+        self.img.setImage(seg.T, autoLevels=False, levels=config.TFR_DB_RANGE)
         x0 = (k0 - 0.5) / self.out_fs - self.axis_zero
-        self.img.setRect(QtCore.QRectF(x0, self.log_lo,
-                                       (k1 - k0) / self.out_fs, self.log_hi - self.log_lo))
+        self.img.setRect(QtCore.QRectF(x0, y0, (k1 - k0) / self.out_fs, y1 - y0))
