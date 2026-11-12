@@ -36,7 +36,8 @@ START_MAXIMIZED = True         # 启动时直接最大化
 
 # ---- 动作类型 (involvement) ----
 def involvement_path(session):
-    return DATA_ROOT / "videos" / f"involvement_{session}_sorted2.csv"
+    # return DATA_ROOT / "videos" / f"involvement_{session}_sorted2.csv"
+    return DATA_ROOT / "videos" / f"involvement_{session}_edited.csv"
 
 INVOLVEMENT_ORDER = ["Resting", "Partial-body", "Whole-body"]   # 图例顺序
 INVOLVEMENT_DEFAULT_COLOR = (200, 200, 200)                     # 未知类别的颜色
