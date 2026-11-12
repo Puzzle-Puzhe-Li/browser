@@ -28,12 +28,13 @@ class ClickableAxis(pg.AxisItem):
     """左侧通道名坐标轴：双击某一行，回调该行对应的名字。"""
 
     def __init__(self, *args, names=None, on_double_click=None,
-                 on_alt_click=None, on_label_click=None, **kwargs):
+                 on_alt_click=None, on_label_click=None, on_label_double_click=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._names = list(names or [])
         self._cb = on_double_click
         self._alt_cb = on_alt_click
         self._label_cb = on_label_click
+        self._label_dbl_cb = on_label_double_click
 
     def _row_name(self, ev):
         vb = self.linkedView()
@@ -45,6 +46,11 @@ class ClickableAxis(pg.AxisItem):
 
     def mouseClickEvent(self, ev):
         if ev.button() == QtCore.Qt.MouseButton.LeftButton:
+            if (self._label_dbl_cb and ev.double()
+                    and self.label.sceneBoundingRect().contains(ev.scenePos())):
+                self._label_dbl_cb()
+                ev.accept()
+                return            
             if (self._label_cb and not ev.double()
                     and self.label.sceneBoundingRect().contains(ev.scenePos())):
                 self._label_cb()
@@ -68,7 +74,8 @@ class SignalPanel(QtWidgets.QWidget):
     gainChanged = QtCore.Signal(float)     # 当前灵敏度 (数据单位 / 通道间距)
     channelDoubleClicked = QtCore.Signal(str)   # 双击左侧通道名
     channelAltClicked = QtCore.Signal(str)
-    axisLabelClicked = QtCore.Signal()    
+    axisLabelClicked = QtCore.Signal()  
+    axisLabelDoubleClicked = QtCore.Signal()      
 
     def __init__(self, data, names, fs, clock, colors=None, t_offset=0.0,
                  unit_per_spacing=100.0, remove_mean=False, zero_baseline=False,
@@ -94,7 +101,11 @@ class SignalPanel(QtWidgets.QWidget):
         left_axis = ClickableAxis("left", names=names,
                                   on_double_click=self.channelDoubleClicked.emit,
                                   on_alt_click=self.channelAltClicked.emit,
-                                  on_label_click=self.axisLabelClicked.emit)
+                                  on_label_click=self.axisLabelClicked.emit,
+                                  on_label_double_click=self.axisLabelDoubleClicked.emit)
+        self.left_axis = left_axis
+        self.zero_baseline = zero_baseline
+        self.y_top_pad = y_top_pad
         self.plot = pg.PlotWidget(axisItems={"left": left_axis})
         self.plot.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)        
         lay = QtWidgets.QVBoxLayout(self)
@@ -157,11 +168,43 @@ class SignalPanel(QtWidgets.QWidget):
 
         self.playhead = pg.InfiniteLine(pos=0, angle=90, movable=False,
                                         pen=pg.mkPen("r", width=1.5))
+        self.playhead.setZValue(10)        
         pi.addItem(self.playhead)
 
         clock.timeChanged.connect(self.update_view)
         self.update_view(clock.time)
 
+    def set_data(self, data, names, fs, t_offset, colors=None,
+                 unit_per_spacing=None, ylabel=None):
+        pi = self.plot.getPlotItem()
+        for c in self.curves:
+            pi.removeItem(c)
+        self.data, self.names, self.fs = data, names, float(fs)
+        self.t_offset = float(t_offset)
+        self.n_ch, self.n_samp = data.shape
+        self.has_nan = bool(np.isnan(data).any())
+        self.n_win = int(round(config.WINDOW_SEC * self.fs))
+        self.offsets = np.arange(self.n_ch - 1, -1, -1, dtype=np.float32)[:, None]
+        if unit_per_spacing is not None:
+            self.unit_per_spacing = float(unit_per_spacing)
+        self.left_axis._names = list(names)
+        self.left_axis.setTicks([[(float(self.n_ch - 1 - i), n) for i, n in enumerate(names)]])
+        if ylabel:
+            pi.setLabel("left", ylabel)
+        if self.zero_baseline:
+            top = self.n_ch - 1 + (self.y_top_pad if self.y_top_pad is not None else 0.6)
+            pi.setYRange(-0.6, top, padding=0)
+        else:
+            pi.setYRange(-1, self.n_ch + 0.5, padding=0)
+        colors = colors or {}
+        self.curves = []
+        for name in names:
+            c = pg.PlotCurveItem(pen=pg.mkPen(colors.get(name.strip(), config.LINE_COLOR), width=1))
+            pi.addItem(c)
+            self.curves.append(c)
+        self.gainChanged.emit(self.unit_per_spacing)
+        self.update_view(self.clock.time)
+        
     # ---- 对外接口 ----
     def change_gain(self, more_sensitive):
         f = config.GAIN_STEP

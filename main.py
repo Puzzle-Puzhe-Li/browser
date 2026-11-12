@@ -342,6 +342,10 @@ class MainWindow(QtWidgets.QWidget):
             lambda p: self.btn.setText("⏸ 暂停" if p else "▶ 播放"))
         self.eeg_panel.gainChanged.connect(self._refresh_info)
         self.speed_panel.gainChanged.connect(self._refresh_info)
+        self._speed_lin = speed
+        self._speed_alt = None
+        self._speed_alt_on = False
+        self.speed_panel.axisLabelDoubleClicked.connect(self._toggle_speed)        
         self.eeg_panel.channelDoubleClicked.connect(self.tfr_panel.set_channel)
         if self.ica_panel is not None:
             self.ica_panel.channelDoubleClicked.connect(self._ica_tfr)        
@@ -351,6 +355,25 @@ class MainWindow(QtWidgets.QWidget):
         self._on_time(0.0)
         self._refresh_info()
         self.setMinimumSize(640, 480)
+
+    def _toggle_speed(self):
+        if self._speed_alt is None:
+            p = config.speed_alt_path(self._session)
+            if not p.exists():
+                QtWidgets.QMessageBox.warning(self, "找不到文件", str(p))
+                self.setFocus()
+                return
+            self._speed_alt = load_speed_csv(p)
+        self._speed_alt_on = not self._speed_alt_on
+        if self._speed_alt_on:
+            m, upp, lab = self._speed_alt, config.SPEED_ALT_PER_SPACING, config.SPEED_ALT_LABEL
+        else:
+            m, upp, lab = self._speed_lin, config.SPEED_PER_SPACING, "Global velocity (cm/s)"
+        self.speed_panel.set_data(
+            m.data, m.names, m.fs, self.t0 + m.t_start,
+            colors=load_colors(config.JOINT_CMAP_PATH),
+            unit_per_spacing=upp, ylabel=lab)
+        self.setFocus()
 
     def _inv_color_at(self, t):
         for s, e, l, _ in self.inv_model.segs:

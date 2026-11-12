@@ -90,6 +90,12 @@ WINDOW_SCREEN_FRAC = (0.95, 0.92)   # 窗口占屏幕可用区域的 (宽, 高) 
 SPEED_YPAD_TOP = 2.0
 SPEED_PER_SPACING = 10     # 初始灵敏度：取全部速度值的该百分位作为一个通道间距
 
+def speed_alt_path(session):
+    return DATA_ROOT / "coor" / f"segment_angvel_{session}.csv"
+
+SPEED_ALT_PER_SPACING = 100
+SPEED_ALT_LABEL = "Local velocity (deg/s)"
+
 # ---- TFR ----
 import numpy as np
 TFR_FREQS = np.arange(2, 150, 2)       # 频率 (Hz)
