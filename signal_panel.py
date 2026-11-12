@@ -75,7 +75,8 @@ class SignalPanel(QtWidgets.QWidget):
     channelDoubleClicked = QtCore.Signal(str)   # 双击左侧通道名
     channelAltClicked = QtCore.Signal(str)
     axisLabelClicked = QtCore.Signal()  
-    axisLabelDoubleClicked = QtCore.Signal()      
+    axisLabelDoubleClicked = QtCore.Signal()   
+    rightClicked = QtCore.Signal(QtCore.QPoint)       
 
     def __init__(self, data, names, fs, clock, colors=None, t_offset=0.0,
                  unit_per_spacing=100.0, remove_mean=False, zero_baseline=False,
@@ -147,7 +148,8 @@ class SignalPanel(QtWidgets.QWidget):
             c = pg.PlotCurveItem(pen=pg.mkPen(color, width=1))
             pi.addItem(c)
             self.curves.append(c)
-            
+
+        self.user_regions = []
         for a, b in (shade or []):
             r = pg.LinearRegionItem((a - self.axis_zero, b - self.axis_zero), movable=False,
                                     brush=pg.mkBrush(*shade_color))
@@ -171,6 +173,7 @@ class SignalPanel(QtWidgets.QWidget):
         self.playhead.setZValue(10)        
         pi.addItem(self.playhead)
 
+        self.plot.viewport().installEventFilter(self)
         clock.timeChanged.connect(self.update_view)
         self.update_view(clock.time)
 
@@ -204,7 +207,29 @@ class SignalPanel(QtWidgets.QWidget):
             self.curves.append(c)
         self.gainChanged.emit(self.unit_per_spacing)
         self.update_view(self.clock.time)
-        
+
+    def set_user_shade(self, spans, color=(165, 165, 165)):
+        pi = self.plot.getPlotItem()
+        for r in self.user_regions:
+            pi.removeItem(r)
+        self.user_regions = []
+        for a, b in spans:
+            r = pg.LinearRegionItem((a - self.axis_zero, b - self.axis_zero), movable=False,
+                                    brush=pg.mkBrush(*color))
+            for ln in r.lines:
+                ln.setPen(pg.mkPen(None))
+            r.setZValue(-9)
+            pi.addItem(r)
+            self.user_regions.append(r)
+
+    def eventFilter(self, obj, ev):
+        if (obj is self.plot.viewport()
+                and ev.type() == QtCore.QEvent.Type.MouseButtonRelease
+                and ev.button() == QtCore.Qt.MouseButton.RightButton):
+            self.rightClicked.emit(ev.globalPosition().toPoint())
+            return True
+        return super().eventFilter(obj, ev)
+
     # ---- 对外接口 ----
     def change_gain(self, more_sensitive):
         f = config.GAIN_STEP

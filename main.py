@@ -1,6 +1,6 @@
 """入口：python main.py [session]      例如  python main.py A0"""
 import sys
-
+import pandas as pd
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
@@ -252,6 +252,7 @@ class MainWindow(QtWidgets.QWidget):
         self.inv_panel.setMinimumSize(100, 28)      # 新增
 
         self._updating = False
+        self.user_bad = {"eeg": [], "speed": []}
         NF = QtCore.Qt.FocusPolicy.NoFocus     # 让方向键、空格始终由主窗口接收
 
         self.btn = QtWidgets.QPushButton("▶ 播放")
@@ -350,6 +351,10 @@ class MainWindow(QtWidgets.QWidget):
         self._speed_alt_on = False
         self.speed_panel.axisLabelDoubleClicked.connect(self._toggle_speed)        
         self.eeg_panel.channelDoubleClicked.connect(self.tfr_panel.set_channel)
+        self.speed_panel.rightClicked.connect(lambda gp: self._bad_menu("speed", gp))
+        self.eeg_panel.rightClicked.connect(lambda gp: self._bad_menu("eeg", gp))
+        if self.ica_panel is not None:
+            self.ica_panel.rightClicked.connect(lambda gp: self._bad_menu("eeg", gp))        
         if self.ica_panel is not None:
             self.ica_panel.channelDoubleClicked.connect(self._ica_tfr)        
             self.ica_panel.channelAltClicked.connect(self._show_ic)
@@ -437,9 +442,66 @@ class MainWindow(QtWidgets.QWidget):
         act.triggered.connect(
             lambda _=False: self.inv_model.assign(a, b, CLEAR_LABEL))            
         m.addSeparator()
+        for text, kind in (("标记为脑电坏段", "eeg"), ("标记为速度坏段", "speed")):
+            m.addAction(text).triggered.connect(
+                lambda _=False, k=kind: self._mark_bad(k, a, b))
+        m.addAction("清除手动坏段标记").triggered.connect(
+            lambda _=False: [self._mark_bad(k, a, b, False) for k in self.user_bad])
+        m.addSeparator()
         m.addAction("取消")
         m.exec(gp)
         self.overlay.set_selection(None)
+
+    def _mark_bad(self, kind, a, b, add=True):
+        out = []
+        for s, e in self.user_bad[kind]:
+            if e <= a or s >= b:
+                out.append((s, e))
+            else:
+                if s < a:
+                    out.append((s, a))
+                if e > b:
+                    out.append((b, e))
+        if add:
+            out.append((a, b))
+        out.sort()
+        merged = []
+        for s, e in out:
+            if merged and s <= merged[-1][1] + 1e-6:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], e))
+            else:
+                merged.append((s, e))
+        self.user_bad[kind] = merged
+        panels = [self.speed_panel] if kind == "speed" else [self.eeg_panel, self.ica_panel]
+        for p in panels:
+            if p is not None:
+                p.set_user_shade(merged)
+
+    def _bad_menu(self, kind, gp):
+        m = QtWidgets.QMenu(self)
+        name = "脑电" if kind == "eeg" else "速度"
+        m.addAction(f"导出{name}手动坏段 (csv) …").triggered.connect(
+            lambda: self._export_bad(kind))
+        m.exec(gp)
+        self.setFocus()
+
+    def _export_bad(self, kind):
+        default = str(config.involvement_path(self._session).parent
+                      / f"bad_{kind}_{self._session}_manual.csv")
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "导出坏段", default, "CSV (*.csv)")
+        if not path:
+            return
+        if not path.lower().endswith(".csv"):
+            path += ".csv"
+        rows = [{"Onset": round(s - self.t0, 6), "Duration": round(e - s, 6),
+                 "Annotation": "bad_manual"} for s, e in self.user_bad[kind]]
+        try:
+            pd.DataFrame(rows, columns=["Onset", "Duration", "Annotation"]).to_csv(
+                path, index=False, encoding="utf-8-sig")
+        except Exception as ex:
+            QtWidgets.QMessageBox.critical(self, "导出失败", str(ex))
+            return
+        QtWidgets.QMessageBox.information(self, "导出完成", f"已保存到：\n{path}")        
 
     def place_normal(self):
         """show 之前调用：把"正常（非最大化）状态"的大小和位置设成屏幕可用区域内居中。"""
