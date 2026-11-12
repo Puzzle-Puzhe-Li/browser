@@ -114,3 +114,37 @@ def load_bad_spans(path):
         print("[bad段] 表中没有 sample_start 行，按 0 处理")
     is_bad = ann.str.startswith("bad") & onset.notna() & dur.notna()
     return [(float(o - ss), float(o + d - ss)) for o, d in zip(onset[is_bad], dur[is_bad])]
+
+def load_speed_bad_spans(path):
+    try:
+        df = pd.read_excel(path)
+    except Exception as ex:
+        print(f"[速度bad段] 读取失败: {ex}")
+        return []
+    df.columns = [str(c).strip() for c in df.columns]
+    low = {c.lower(): c for c in df.columns}
+
+    def pick(*keys):
+        for k in keys:
+            for lc, c in low.items():
+                if k in lc:
+                    return c
+        return None
+
+    c_on = pick("onset", "start", "begin")
+    c_du = pick("duration")
+    c_en = pick("end", "stop", "offset")
+    if c_on is None or (c_du is None and c_en is None):
+        print(f"[速度bad段] 找不到起止列，现有列: {list(df.columns)}")
+        return []
+    s = pd.to_numeric(df[c_on], errors="coerce")
+    e = s + pd.to_numeric(df[c_du], errors="coerce") if c_du else pd.to_numeric(df[c_en], errors="coerce")
+    ok = s.notna() & e.notna() & (e > s)
+    spans = sorted(zip(s[ok].astype(float), e[ok].astype(float)))
+    merged = []
+    for a, b in spans:
+        if merged and a <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], b))
+        else:
+            merged.append((a, b))
+    return merged

@@ -13,7 +13,8 @@ from tfr_panel import TFRPanel
 from involvement_panel import InvolvementPanel
 
 from motion_loader import (load_speed_csv, load_blink_times,
-                           load_video_sync, load_involvement_table, load_bad_spans)
+                           load_video_sync, load_involvement_table, load_bad_spans,
+                           load_speed_bad_spans)
 from involvement_model import InvolvementModel, CLEAR_LABEL
 from selection import SelectionHost, SelectionOverlay, SelectionController
 from ica_colors import compute_ica_colors
@@ -170,6 +171,8 @@ class MainWindow(QtWidgets.QWidget):
         self.resize(W, H)
 
         bad_spans = [(a + self.t0, b + self.t0) for a, b in load_bad_spans(config.ica_annotation_path(session))]
+        speed_bad = [(a + self.t0, b + self.t0) for a, b in load_speed_bad_spans(config.speed_bad_path(session))]
+        print(f"[速度bad段] {len(speed_bad)} 段")        
         print(f"[bad段] {len(bad_spans)} 段")
 
         self.speed_panel = SignalPanel(
@@ -178,7 +181,7 @@ class MainWindow(QtWidgets.QWidget):
             t_offset=self.t0 + speed.t_start,
             unit_per_spacing=config.SPEED_PER_SPACING, remove_mean=False,
             zero_baseline=True, show_time_axis=False, axis_zero=self.t0,
-            ylabel="Joint velocity (cm/s)", y_top_pad=config.SPEED_YPAD_TOP)
+            ylabel="Joint velocity (cm/s)", y_top_pad=config.SPEED_YPAD_TOP, shade=speed_bad)
 
         self.eeg_panel = SignalPanel(
             eeg.data, eeg.names, eeg.fs, self.clock,

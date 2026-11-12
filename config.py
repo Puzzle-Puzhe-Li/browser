@@ -93,6 +93,9 @@ SPEED_PER_SPACING = 10     # 初始灵敏度：取全部速度值的该百分位
 def speed_alt_path(session):
     return DATA_ROOT / "coor" / f"segment_angvel_{session}.csv"
 
+def speed_bad_path(session):
+    return DATA_ROOT / "coor" / f"annots_{session}_bad_miss.xlsx"
+
 SPEED_ALT_PER_SPACING = 100
 SPEED_ALT_LABEL = "Local velocity (deg/s)"
 
