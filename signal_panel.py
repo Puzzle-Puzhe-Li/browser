@@ -82,7 +82,7 @@ class SignalPanel(QtWidgets.QWidget):
                  unit_per_spacing=100.0, remove_mean=False, zero_baseline=False,
                  show_time_axis=True, axis_zero=0.0, 
                  marks=None, mark_color=(70, 70, 70), mark_height=0.35,
-                 ylabel=None, y_top_pad=None, shade=None, shade_color=(225, 225, 225), parent=None):
+                 ylabel=None, y_top_pad=None, shade=None, shade_color=(180, 180, 180, 120), parent=None):
         super().__init__(parent)
         self.data = data
         self.names = names
@@ -208,7 +208,7 @@ class SignalPanel(QtWidgets.QWidget):
         self.gainChanged.emit(self.unit_per_spacing)
         self.update_view(self.clock.time)
 
-    def set_user_shade(self, spans, color=(165, 165, 165)):
+    def set_user_shade(self, spans, color=(100, 100, 100, 120)):
         pi = self.plot.getPlotItem()
         for r in self.user_regions:
             pi.removeItem(r)
