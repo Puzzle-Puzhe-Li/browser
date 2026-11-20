@@ -25,6 +25,7 @@ class SelectionOverlay(QtWidgets.QWidget):
         host.overlay = self
         self.setGeometry(host.rect())
         self.raise_()
+        self.hide()
 
     def _edges(self):
         if self.sel is None:
@@ -34,6 +35,12 @@ class SelectionOverlay(QtWidgets.QWidget):
     def set_selection(self, a, b=None):
         old = self._edges()
         self.sel = None if a is None else (min(a, b), max(a, b))
+        if self.sel is None:
+            self.hide()
+            return
+        if not self.isVisible():
+            self.show()
+            self.raise_()
         new = self._edges()
         if old is None and new is None:
             return

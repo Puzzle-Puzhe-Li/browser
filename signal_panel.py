@@ -150,13 +150,13 @@ class SignalPanel(QtWidgets.QWidget):
             self.curves.append(c)
 
         self.user_regions = []
-        for a, b in (shade or []):
-            r = pg.LinearRegionItem((a - self.axis_zero, b - self.axis_zero), movable=False,
-                                    brush=pg.mkBrush(*shade_color))
-            for ln in r.lines:
-                ln.setPen(pg.mkPen(None))
-            r.setZValue(-10)
-            pi.addItem(r)
+        self.shade_item = None
+        if shade:
+            arr = np.asarray(shade, dtype=float) - self.axis_zero
+            self.shade_item = pg.BarGraphItem(x0=arr[:, 0], x1=arr[:, 1], y0=-2, y1=self.n_ch + 2,
+                                            brush=pg.mkBrush(*shade_color), pen=pg.mkPen(None))
+            self.shade_item.setZValue(-10)
+            pi.addItem(self.shade_item)
 
         # 事件标记（如眨眼）：贴着横轴的短竖线，marks 为 EEG 时间（秒）
         if marks is not None and len(marks) > 0:
@@ -213,14 +213,14 @@ class SignalPanel(QtWidgets.QWidget):
         for r in self.user_regions:
             pi.removeItem(r)
         self.user_regions = []
-        for a, b in spans:
-            r = pg.LinearRegionItem((a - self.axis_zero, b - self.axis_zero), movable=False,
-                                    brush=pg.mkBrush(*color))
-            for ln in r.lines:
-                ln.setPen(pg.mkPen(None))
-            r.setZValue(-9)
-            pi.addItem(r)
-            self.user_regions.append(r)
+        if not spans:
+            return
+        arr = np.asarray(spans, dtype=float) - self.axis_zero
+        r = pg.BarGraphItem(x0=arr[:, 0], x1=arr[:, 1], y0=-2, y1=self.n_ch + 2,
+                            brush=pg.mkBrush(*color), pen=pg.mkPen(None))
+        r.setZValue(-9)
+        pi.addItem(r)
+        self.user_regions.append(r)
 
     def eventFilter(self, obj, ev):
         if (obj is self.plot.viewport()

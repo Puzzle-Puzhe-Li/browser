@@ -323,9 +323,9 @@ class MainWindow(QtWidgets.QWidget):
             self.eeg_panel, self.overlay, self.clock, self.t0, eeg.duration, parent=self)
         self.selector.selectionMade.connect(self._on_selection)
         self.clock.timeChanged.connect(
-            lambda _: self.overlay.set_selection(None))
+            lambda _: self.overlay.set_selection(None) if self.overlay.sel is not None else None)
         self.clock.playingChanged.connect(
-            lambda _: self.overlay.set_selection(None))
+            lambda _: self.overlay.set_selection(None) if self.overlay.sel is not None else None)       
         self.inv_model.dirtyChanged.connect(self._update_title)
         self._session = session
 
